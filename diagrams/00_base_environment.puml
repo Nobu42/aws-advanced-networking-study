@@ -1,0 +1,81 @@
+@startuml
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+
+title 00 Base Environment\naws-reference VPC
+
+actor "Internet User" as user
+cloud "Internet" as internet
+node "Route 53\nPublic Hosted Zone" as public_dns
+storage "Amazon S3" as s3
+node "Amazon SES" as ses
+
+node "VPC: sample-vpc\n10.0.0.0/16\nBase system managed by aws-reference" as base_vpc {
+    rectangle "Availability Zone: ap-northeast-1a" as az1a {
+        package "Public Subnet 01\n10.0.0.0/20" as public1 {
+            [Bastion] as bastion
+            [NAT Gateway 01] as nat1
+        }
+
+        package "Private Subnet 01\n10.0.64.0/20" as private1 {
+            [Web Server 01] as web1
+        }
+    }
+
+    rectangle "Availability Zone: ap-northeast-1c" as az1c {
+        package "Public Subnet 02\n10.0.16.0/20" as public2 {
+            [NAT Gateway 02] as nat2
+        }
+
+        package "Private Subnet 02\n10.0.80.0/20" as private2 {
+            [Web Server 02] as web2
+        }
+    }
+
+    node "Internet-facing ALB\nPublic Subnet 01 / 02" as alb
+    database "RDS MySQL\nPrivate DB Subnet Group" as rds
+    node "ElastiCache Redis\nPrivate Subnets" as redis
+    node "Route 53\nPrivate Hosted Zone: home" as private_dns
+    node "Internet Gateway" as igw
+}
+
+user --> public_dns : DNS query
+public_dns --> alb : Application name
+user --> internet
+internet --> igw : HTTPS 443
+igw --> alb
+
+alb --> web1 : HTTP 3000
+alb --> web2 : HTTP 3000
+bastion -[#blue]-> web1 : SSH 22
+bastion -[#blue]-> web2 : SSH 22
+
+web1 --> rds : MySQL 3306
+web2 --> rds : MySQL 3306
+web1 --> redis : Redis 6379
+web2 --> redis : Redis 6379
+
+private_dns --> web1 : web01.home
+private_dns --> web2 : web02.home
+private_dns --> rds : db.home
+
+web1 --> nat1 : Internet-bound traffic
+web2 --> nat2 : Internet-bound traffic
+nat1 --> igw
+nat2 --> igw
+
+web1 --> s3 : AWS service access
+web2 --> s3 : AWS service access
+web1 --> ses : SMTP
+web2 --> ses : SMTP
+
+legend right
+  |= Purpose |= Description |
+  | Base environment | Stable application system used as a lab destination |
+  | Main path | Internet -> ALB -> Web -> RDS / Redis |
+  | Lab extension | Add connectivity without rewriting this base system |
+endlegend
+
+@enduml

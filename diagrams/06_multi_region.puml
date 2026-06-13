@@ -1,0 +1,69 @@
+@startuml
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+
+title 06 Multi-Region Network\nGlobal entry and Transit Gateway peering
+
+actor "Global User" as user
+node "AWS Global Accelerator\nAnycast static IPs\nHealth-based regional routing" as ga
+
+rectangle "Region: ap-northeast-1" as tokyo {
+    node "Transit Gateway: Tokyo" as tgw_tokyo
+
+    node "Application VPC: Tokyo\n10.0.0.0/16" as app_tokyo {
+        node "Internet-facing ALB" as alb_tokyo
+        [Application Tokyo] as workload_tokyo
+    }
+
+    node "Shared Services VPC: Tokyo\n10.10.0.0/16" as shared_tokyo {
+        [Shared Service Tokyo] as service_tokyo
+    }
+}
+
+rectangle "Region: us-west-2" as oregon {
+    node "Transit Gateway: Oregon" as tgw_oregon
+
+    node "Application VPC: Oregon\n10.100.0.0/16" as app_oregon {
+        node "Internet-facing ALB" as alb_oregon
+        [Application Oregon] as workload_oregon
+    }
+
+    node "Shared Services VPC: Oregon\n10.110.0.0/16" as shared_oregon {
+        [Shared Service Oregon] as service_oregon
+    }
+}
+
+user --> ga
+ga -[#green,bold]-> alb_tokyo : Healthy / nearest endpoint
+ga -[#blue,dashed]-> alb_oregon : Regional failover
+alb_tokyo --> workload_tokyo
+alb_oregon --> workload_oregon
+
+app_tokyo --> tgw_tokyo
+shared_tokyo --> tgw_tokyo
+app_oregon --> tgw_oregon
+shared_oregon --> tgw_oregon
+
+tgw_tokyo <-[#purple,bold]-> tgw_oregon : Inter-Region TGW peering
+
+note bottom of tgw_tokyo
+  Transit Gateway peering does not dynamically propagate routes between TGW route tables.
+  Add the required static routes on both regional TGWs and VPC route tables.
+end note
+
+note bottom of ga
+  Global Accelerator is for global TCP/UDP entry with static Anycast IPs.
+  Route 53 routing policies are DNS-based and may be preferred for other requirements.
+end note
+
+legend right
+  |= Check |= Exam point |
+  | CIDR | Use non-overlapping regional address ranges |
+  | TGW peering | Configure static routes in both regions |
+  | Global entry | Compare Global Accelerator, Route 53, and CloudFront |
+  | Resilience | Test regional health checks, failover, and data dependencies |
+endlegend
+
+@enduml

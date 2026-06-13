@@ -1,0 +1,64 @@
+@startuml
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+
+title 05 Centralized Inspection\nTransit Gateway and AWS Network Firewall
+
+node "Spoke VPC A\n10.0.0.0/16" as spoke_a {
+    [Application A] as app_a
+    node "Spoke Route Table\n0.0.0.0/0 -> TGW" as spoke_a_rt
+}
+
+node "Spoke VPC B\n10.20.0.0/16" as spoke_b {
+    [Application B] as app_b
+    node "Spoke Route Table\n0.0.0.0/0 -> TGW" as spoke_b_rt
+}
+
+node "AWS Transit Gateway\nInspection attachment: appliance mode enabled" as tgw {
+    node "Spoke TGW Route Table\n0.0.0.0/0 -> Inspection attachment" as spoke_tgw_rt
+    node "Inspection TGW Route Table\nSpoke CIDRs -> spoke attachments" as inspection_tgw_rt
+}
+
+node "Inspection / Egress VPC\n10.100.0.0/16" as inspection_vpc {
+    node "TGW Attachment Subnets" as tgw_subnets
+    node "AWS Network Firewall\nEndpoints in multiple AZs" as firewall
+    node "NAT Gateway per AZ" as nat
+    node "Internet Gateway" as igw
+}
+
+cloud "Internet" as internet
+
+app_a -[#green,bold]-> tgw : Outbound traffic
+app_b -[#green,bold]-> tgw : Outbound traffic
+tgw -[#green,bold]-> tgw_subnets
+tgw_subnets -[#green,bold]-> firewall : Route to firewall endpoint
+firewall -[#green,bold]-> nat : Inspected traffic
+nat -[#green,bold]-> igw
+igw -[#green,bold]-> internet
+
+internet -[#blue,dashed]-> igw : Return traffic
+igw -[#blue,dashed]-> nat
+nat -[#blue,dashed]-> firewall
+firewall -[#blue,dashed]-> tgw_subnets
+tgw_subnets -[#blue,dashed]-> tgw
+tgw -[#blue,dashed]-> app_a : Symmetric return path
+
+spoke_a_rt .. tgw
+spoke_b_rt .. tgw
+
+note bottom of inspection_vpc
+  Route tables must steer both directions through the same stateful firewall path.
+  Keep traffic in the same AZ where possible and verify appliance mode behavior.
+end note
+
+legend right
+  |= Check |= Exam point |
+  | Symmetry | Stateful inspection requires symmetric forward and return paths |
+  | Appliance mode | Helps keep flows on the same TGW attachment AZ path |
+  | Routes | Check spoke, TGW, inspection subnet, NAT, and IGW routes |
+  | Cost/HA | Account for cross-AZ traffic and deploy firewall endpoints per AZ |
+endlegend
+
+@enduml

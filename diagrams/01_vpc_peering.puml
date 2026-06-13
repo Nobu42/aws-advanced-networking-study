@@ -1,0 +1,53 @@
+@startuml
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+
+title 01 VPC Peering\nNon-transitive connectivity
+
+node "VPC A: aws-reference\n10.0.0.0/16" as vpc_a {
+    [Web Server] as web
+    node "Route Table A\n10.10.0.0/16 -> pcx-AB" as rta
+}
+
+node "VPC B: Shared Services\n10.10.0.0/16" as vpc_b {
+    [Shared Service] as shared
+    node "Route Table B\n10.0.0.0/16 -> pcx-AB\n10.20.0.0/16 -> pcx-BC" as rtb
+}
+
+node "VPC C: Lab Client\n10.20.0.0/16" as vpc_c {
+    [Lab Client] as client
+    node "Route Table C\n10.10.0.0/16 -> pcx-BC" as rtc
+}
+
+cloud "VPC Peering\npcx-AB" as peer_ab
+cloud "VPC Peering\npcx-BC" as peer_bc
+
+web -[#green,bold]-> peer_ab : A to B
+peer_ab -[#green,bold]-> shared
+
+shared -[#green,bold]-> peer_bc : B to C
+peer_bc -[#green,bold]-> client
+
+web -[#red,dashed]-> client : A to C is not transitive
+
+rta .. peer_ab
+rtb .. peer_ab
+rtb .. peer_bc
+rtc .. peer_bc
+
+note bottom of vpc_b
+  VPC B cannot route traffic between
+  peering connections on behalf of A and C.
+end note
+
+legend right
+  |= Check |= Exam point |
+  | CIDR | Peered VPC CIDRs must not overlap |
+  | Routes | Both directions require route entries |
+  | Security | SG/NACL and DNS settings still apply |
+  | Limitation | VPC Peering is non-transitive |
+endlegend
+
+@enduml

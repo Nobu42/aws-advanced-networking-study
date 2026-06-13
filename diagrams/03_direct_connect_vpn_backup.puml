@@ -1,0 +1,63 @@
+@startuml
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+
+title 03 Direct Connect with VPN Backup\nHybrid connectivity and BGP
+
+node "On-premises Data Center\nASN 65000" as onprem {
+    [Application / User Network] as onprem_net
+    node "Customer Router" as router
+}
+
+cloud "Direct Connect Location" as dx_location
+node "Direct Connect Connection" as dx
+node "Private Transit VIF\nBGP session" as transit_vif
+node "Direct Connect Gateway" as dxgw
+
+cloud "Internet" as internet
+node "Site-to-Site VPN\nTwo IPsec tunnels\nBGP sessions" as vpn
+
+node "AWS Transit Gateway\nASN 64512" as tgw
+
+node "Application VPC\n10.0.0.0/16" as app_vpc {
+    [AWS Workload] as workload
+}
+
+onprem_net --> router
+
+router -[#green,bold]-> dx_location : Primary physical path
+dx_location -[#green,bold]-> dx
+dx -[#green,bold]-> transit_vif
+transit_vif -[#green,bold]-> dxgw
+dxgw -[#green,bold]-> tgw : DX gateway association
+
+router -[#blue,dashed]-> internet : Backup path
+internet -[#blue,dashed]-> vpn : Encrypted IPsec
+vpn -[#blue,dashed]-> tgw
+
+tgw --> app_vpc
+app_vpc --> workload
+
+note bottom of router
+  Advertise and accept only intended prefixes.
+  Design BGP attributes and AWS route priority so Direct Connect is preferred
+  and VPN is used after a failure.
+end note
+
+note bottom of dx
+  Direct Connect is private connectivity,
+  but traffic is not encrypted by default.
+  Use MACsec where supported or VPN over Direct Connect when encryption is required.
+end note
+
+legend right
+  |= Check |= Exam point |
+  | Direct Connect | Consistent private connectivity; not encrypted by default |
+  | VPN | Encrypted backup path with two tunnels |
+  | BGP | Dynamic prefix exchange and failover |
+  | Resiliency | Consider redundant connections, locations, and customer routers |
+endlegend
+
+@enduml

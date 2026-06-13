@@ -1,0 +1,48 @@
+@startuml
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+
+title 04 Hybrid DNS\nRoute 53 Resolver inbound and outbound endpoints
+
+node "On-premises Network" as onprem {
+    [On-premises Client] as onprem_client
+    node "On-premises DNS Resolver\ndc.example.com" as onprem_dns
+}
+
+cloud "Direct Connect / VPN" as hybrid_link
+
+node "DNS Services VPC\n10.10.0.0/16" as dns_vpc {
+    node "Route 53 Resolver\nInbound Endpoint\nTwo or more AZs" as inbound
+    node "Route 53 Resolver\nOutbound Endpoint\nTwo or more AZs" as outbound
+    node "Resolver Rule\ndc.example.com -> on-prem DNS" as rule
+    node "Route 53 Private Hosted Zone\naws.example.com" as phz
+    [AWS Workload] as aws_client
+}
+
+onprem_client --> onprem_dns : 1. Query app.aws.example.com
+onprem_dns -[#green,bold]-> hybrid_link
+hybrid_link -[#green,bold]-> inbound : 2. Conditional forward
+inbound -[#green,bold]-> phz : 3. Resolve AWS private name
+
+aws_client -[#blue,bold]-> outbound : 1. Query server.dc.example.com
+outbound -[#blue,bold]-> rule : 2. Match forwarding rule
+rule -[#blue,bold]-> hybrid_link
+hybrid_link -[#blue,bold]-> onprem_dns : 3. Forward to on-prem DNS
+
+note bottom of dns_vpc
+  Inbound endpoint: on-premises DNS queries AWS private DNS.
+  Outbound endpoint: VPC workloads query on-premises DNS.
+  Share Resolver rules with AWS RAM when multiple accounts use them.
+end note
+
+legend right
+  |= Check |= Exam point |
+  | Connectivity | DNS endpoint IPs must be reachable over DX/VPN/TGW |
+  | Security Group | Allow TCP and UDP port 53 as required |
+  | Availability | Deploy endpoint IPs across multiple AZs |
+  | Rule scope | Associate or share rules with the required VPCs/accounts |
+endlegend
+
+@enduml

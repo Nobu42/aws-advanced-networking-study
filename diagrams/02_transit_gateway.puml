@@ -1,0 +1,58 @@
+@startuml
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment center
+
+title 02 Transit Gateway\nHub-and-spoke routing and segmentation
+
+node "Application VPC\n10.0.0.0/16" as app_vpc {
+    [Web Application] as app
+    node "VPC Route Table\n10.10.0.0/16 -> tgw\n10.20.0.0/16 -> tgw" as app_rt
+}
+
+node "Shared Services VPC\n10.10.0.0/16" as shared_vpc {
+    [DNS / Directory / Tools] as shared
+    node "VPC Route Table\n10.0.0.0/8 -> tgw" as shared_rt
+}
+
+node "Development VPC\n10.20.0.0/16" as dev_vpc {
+    [Development Workload] as dev
+    node "VPC Route Table\n10.10.0.0/16 -> tgw" as dev_rt
+}
+
+node "AWS Transit Gateway" as tgw {
+    node "Production TGW Route Table\nAssociated: Application\nRoutes: Shared Services only" as prod_tgw_rt
+    node "Development TGW Route Table\nAssociated: Development\nRoutes: Shared Services only" as dev_tgw_rt
+    node "Shared TGW Route Table\nAssociated: Shared Services\nRoutes: Application + Development" as shared_tgw_rt
+}
+
+app_vpc -[#green,bold]-> tgw : VPC attachment
+shared_vpc -[#green,bold]-> tgw : VPC attachment
+dev_vpc -[#green,bold]-> tgw : VPC attachment
+
+tgw -[#green,bold]-> shared_vpc : Shared services reachable
+tgw -[#green,bold]-> app_vpc : Return route
+tgw -[#green,bold]-> dev_vpc : Return route
+
+app_vpc -[#red,dashed]-> dev_vpc : Isolated by TGW route tables
+
+app_rt .. tgw
+shared_rt .. tgw
+dev_rt .. tgw
+
+note bottom of tgw
+  Association selects the TGW route table used by traffic entering an attachment.
+  Propagation adds attachment routes to selected TGW route tables.
+  VPC route tables and TGW route tables must both be correct.
+end note
+
+legend right
+  |= Check |= Exam point |
+  | Attachment | Connects VPC, VPN, or Direct Connect path |
+  | Association | One TGW route table per attachment |
+  | Propagation | Can publish an attachment route to multiple TGW route tables |
+  | Segmentation | Control spoke-to-spoke reachability with TGW route tables |
+endlegend
+
+@enduml
