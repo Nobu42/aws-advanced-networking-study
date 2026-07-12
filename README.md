@@ -23,6 +23,8 @@ AWSネットワークの設計、実装、運用、トラブルシューティ�
 
 詳細は [ANS-C01ドメインマップ](./exam-guide/ans-c01-domain-map.md) を参照する。
 
+頻出用語は [ANS-C01 頻出・必須用語集](./exam-guide/ans-c01-key-terms.md) を参照する。
+
 ## ディレクトリ
 
 | ディレクトリ | 用途 |
