@@ -20,3 +20,4 @@ AWSネットワークサービスごとに、用途、設計判断、制約、�
 - AWS WAF、AWS Shield、AWS Firewall Manager
 - [Network Automation](./network-automation-for-ans-c01.md)
 - [Monitoring and Operations](./monitoring-and-operations-for-ans-c01.md)
+- [Troubleshooting](./troubleshooting-for-ans-c01.md)
