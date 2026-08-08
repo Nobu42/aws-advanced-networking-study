@@ -15,6 +15,7 @@ AWSネットワークの設計、実装、運用、トラブルシューティ�
 | 基礎 | [TGW/VIF/VPN チートシート](./fundamentals/tgw-vif-vpn-cheatsheet.md) | Transit Gateway、VIF、VPN接続をまとめて確認する |
 | サービス | [Route 53 ANS-C01対策](./services/route53-for-ans-c01.md) | DNS、Resolver、ルーティングポリシーを確認する |
 | サービス | [Edge Network Services ANS-C01対策](./services/edge-network-services-for-ans-c01.md) | CloudFront、Global Accelerator、Lambda@Edgeを確認する |
+| サービス | [Security Services ANS-C01対策](./services/security-services-for-ans-c01.md) | Shield、WAF、Firewall Manager、IDS/IPS、DNS Firewall、ACMを確認する |
 | 構成図 | [ネットワーク構成図](./diagrams/README.md) | VPC、TGW、DX/VPN、DNS、Inspection構成を図で確認する |
 | ハンズオン | [Labs](./labs/README.md) | 手順、CLI、検証結果を記録する |
 | 問題演習 | [Practice Questions](./practice-questions/README.md) | 練習問題と解説を整理する |
