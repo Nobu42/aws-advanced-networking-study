@@ -12,6 +12,7 @@ AWSネットワークサービスごとに、用途、設計判断、制約、�
 - AWS PrivateLink
 - [Amazon Route 53](./route53-for-ans-c01.md)
 - Elastic Load Balancing
+- [Edge Network Services](./edge-network-services-for-ans-c01.md)
 - Amazon CloudFront
 - AWS Global Accelerator
 - AWS Network Firewall
