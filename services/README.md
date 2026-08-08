@@ -18,3 +18,4 @@ AWSネットワークサービスごとに、用途、設計判断、制約、�
 - AWS Network Firewall
 - [Security Services](./security-services-for-ans-c01.md)
 - AWS WAF、AWS Shield、AWS Firewall Manager
+- [Network Automation](./network-automation-for-ans-c01.md)
