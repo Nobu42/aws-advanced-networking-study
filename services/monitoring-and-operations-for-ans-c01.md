@@ -675,6 +675,36 @@ Direct Connect
 | VPN/DX/TGWの運用状態を確認 | AWS Network Manager + CloudWatch |
 | Cloud WANの中核的な管理 | AWS Network Manager |
 
+## Route Analyzer
+
+Route Analyzerは、Transit Gateway Route Tableの経路を分析する機能である。
+
+確認できること:
+
+```text
+TGW attachment
+TGW route table association
+TGW route propagation
+static route / propagated route
+blackhole route
+```
+
+試験での見方:
+
+| 問題文 | 答え |
+| :--- | :--- |
+| TGW Route Table内でどのAttachmentへ転送されるか確認したい | Route Analyzer |
+| Association/Propagationの結果として経路があるか確認したい | Route Analyzer |
+| VPC内のSecurity GroupやNACLまで含めて到達性を見たい | Reachability Analyzer |
+
+注意:
+
+```text
+Route Analyzer = TGW内の経路分析
+Reachability Analyzer = VPC内の到達性分析
+Flow Logs = 実際に発生した通信ログ
+```
+
 ## CloudWatch Internet Monitor
 
 CloudWatch Internet Monitorは、インターネット経由でアプリケーションへ到達する利用者体験を監視するサービスである。
@@ -736,6 +766,21 @@ CloudWatchとの違い:
 CloudWatch = 自分のリソースやアプリのメトリクス/ログ
 AWS Health = AWSサービス側やアカウント固有の運用イベント
 ```
+
+## Trusted Advisor / Well-Architected Tool
+
+Trusted AdvisorとWell-Architected Toolは、日々の通信ログというより、運用レビューと改善に使う。
+
+| サービス | 役割 | ネットワークでの見方 |
+| :--- | :--- | :--- |
+| Trusted Advisor | AWS環境の健全性チェック | サービスクォータ、冗長化、セキュリティ、コスト、耐障害性 |
+| Well-Architected Tool | フレームワークに沿った設計レビュー | 信頼性、性能効率、運用、セキュリティ、コストの改善計画 |
+
+試験での見方:
+
+- 「サービス制限に近い」「クォータ確認」「冗長化不足を見たい」ならTrusted Advisorを疑う
+- 「設計をベストプラクティスに照らしてレビュー」「継続改善」ならWell-Architected Toolを疑う
+- 個別の通信ログやAPI操作履歴を見たい場合は、Flow LogsやCloudTrailを選ぶ
 
 ## Amazon EventBridge
 
@@ -903,6 +948,9 @@ ALBの障害調査
 | DNSでどのドメインを引いたか | Route 53 Resolver Query Logging |
 | EC2からRDSへ到達可能か | Reachability Analyzer |
 | Internetから管理ポートへ到達できてしまうか | Network Access Analyzer |
+| TGW Route Table上で経路があるか | Route Analyzer |
+| クォータや冗長化の健全性を確認したい | Trusted Advisor |
+| 設計全体をベストプラクティスでレビューしたい | Well-Architected Tool |
 
 ### Flow Logs vs ALB Logs vs CloudTrail
 
@@ -1174,6 +1222,8 @@ InternetからSSH到達可能な経路がないか
 | VPC Flow LogsでHTTPのURLが見える | Flow LogsはIP/port/protocol中心。URLは見えない |
 | ACCEPTならアプリ正常 | ACCEPTはネットワーク制御で許可された意味。アプリ成功ではない |
 | Reachability Analyzerは実際に疎通試験する | 設定を静的分析する。実パケット送信ではない |
+| Route AnalyzerでSG/NACLまで確認できる | Route AnalyzerはTGW Route Table中心。VPC内到達性はReachability Analyzer |
+| Trusted Advisorは通信ログを分析する | Trusted Advisorは健全性チェック。通信ログはFlow Logsなどを見る |
 | AWS Configで誰が変更したか完全に分かる | 実行主体はCloudTrailが得意 |
 | Metric Filterは過去ログも自動でメトリクス化する | 作成後に取り込まれるログが対象 |
 | Traffic Mirroringで通信をブロックできる | ミラーするだけ。遮断はNetwork FirewallやGWLB構成など |
@@ -1212,8 +1262,11 @@ dstaddr
 resolver query log
 traffic mirroring
 reachability analyzer
+route analyzer
 network access analyzer
 AWS Health event
+Trusted Advisor
+Well-Architected Tool
 EventBridge rule
 Systems Manager Automation
 ```
@@ -1228,6 +1281,8 @@ Systems Manager Automation
 - CloudTrail management eventsとdata eventsの違いを説明できる
 - AWS Config Rules、Conformance Packs、Aggregatorの役割を説明できる
 - Reachability AnalyzerとNetwork Access Analyzerの違いを説明できる
+- Route AnalyzerはTGW Route Table中心の経路分析だと説明できる
+- Trusted AdvisorとWell-Architected Toolは運用レビュー/改善向けだと説明できる
 - Traffic MirroringとIPS/IDSの関係を説明できる
 - VPN、Direct Connect、TGW、ALB、NAT Gatewayの代表メトリクスを知っている
 - マルチアカウント監視でOrganization CloudTrail、Config Aggregator、中央ログアカウントを連想できる
@@ -1247,8 +1302,12 @@ Systems Manager Automation
 - [Route 53 Resolver query logging](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html)
 - [What is VPC Reachability Analyzer?](https://docs.aws.amazon.com/vpc/latest/reachability/what-is-reachability-analyzer.html)
 - [What is Network Access Analyzer?](https://docs.aws.amazon.com/vpc/latest/network-access-analyzer/what-is-network-access-analyzer.html)
+- [Route Analyzer for AWS Network Manager](https://docs.aws.amazon.com/network-manager/latest/tgwnm/route-analyzer.html)
 - [What is Amazon CloudWatch Internet Monitor?](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-InternetMonitor.html)
 - [What is Amazon CloudWatch Network Monitor?](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Network-Monitor.html)
 - [What is AWS Health?](https://docs.aws.amazon.com/health/latest/ug/what-is-aws-health.html)
+- [What is AWS Trusted Advisor?](https://docs.aws.amazon.com/awssupport/latest/user/trusted-advisor.html)
+- [Trusted Advisor service quotas](https://docs.aws.amazon.com/awssupport/latest/user/service-limits.html)
+- [AWS Well-Architected Tool](https://docs.aws.amazon.com/wellarchitected/latest/userguide/waf.html)
 - [What is Amazon EventBridge?](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html)
 - [What is AWS Systems Manager?](https://docs.aws.amazon.com/systems-manager/latest/userguide/what-is-systems-manager.html)

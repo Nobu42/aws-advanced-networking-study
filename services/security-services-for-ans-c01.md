@@ -497,6 +497,31 @@ public certificateのDNS検証はpublic DNSで解決できる必要がある
 private hosted zoneだけではpublic certificateの検証に使えない
 ```
 
+## ACM Private CA
+
+ACM Private CAは、組織内向けのプライベート証明書を発行するマネージドCAである。
+
+```text
+ACM Private CA
+  -> private certificate
+  -> internal ALB / private API / service-to-service TLS / mTLS
+```
+
+覚えること:
+
+| 項目 | 内容 |
+| :--- | :--- |
+| 用途 | 社内サービス、内部ALB、プライベートAPI、mTLS、サービス間TLS |
+| 信頼範囲 | 組織内/管理対象端末/管理対象サービス |
+| ACMとの関係 | ACMで証明書を管理し、Private CAで発行元を管理する |
+| Public certificateとの違い | インターネット一般利用者に標準で信頼される証明書ではない |
+
+試験での見方:
+
+- 「内部サービスに証明書を発行」「private certificate」「mTLS」「社内CA」という表現ならACM Private CAを疑う
+- インターネット公開Webサイトなら通常はACM public certificate
+- CloudFront viewer certificateは引き続きus-east-1のACM証明書が論点になる
+
 ## CloudFrontとACMの頻出ポイント
 
 CloudFrontで独自ドメインのHTTPSを使う場合:
@@ -578,6 +603,7 @@ NACL = stateless / allow and deny / subnet
 | サードパーティNGFWを使いたい | GWLB + appliance |
 | 複数VPCの通信を中央検査したい | TGW + Inspection VPC + Network Firewall/GWLB |
 | ステートフル検査で戻り経路が不安定 | TGW appliance mode supportを確認 |
+| 内部サービス向け証明書を発行したい | ACM Private CA |
 
 ## 試験での頻出シナリオ
 
@@ -705,6 +731,7 @@ Route 53 aliasでCloudFrontへ向ける
 | IDSとIPSは同じ | IDSは検知、IPSは遮断 |
 | Traffic Mirroringで通信をブロックできる | ミラーはコピーなので通常はブロックしない |
 | ACM証明書はリージョンをまたいでそのまま使える | ACM証明書はリージョナル。CloudFront用はus-east-1 |
+| Private CA証明書はインターネット利用者にそのまま信頼される | Private CAは組織内の信頼基盤。公開WebはPublic certificateを使う |
 | imported certificateもACMが自動更新する | imported certificateは利用者が更新する |
 | Network FirewallはResolver DNS FirewallのDNS queryを見られる | Resolver経由DNSの制御はDNS Firewall |
 
@@ -724,6 +751,7 @@ Route 53 aliasでCloudFrontへ向ける
 - [ ] DNS FirewallはVPC Resolver経由のアウトバウンドDNS問い合わせを制御
 - [ ] DNS FirewallのBlock応答はNODATA、NXDOMAIN、OVERRIDE
 - [ ] ACM証明書はリージョナル
+- [ ] 内部証明書、mTLS、社内CA要件ではACM Private CAを検討する
 - [ ] CloudFront用ACM証明書はus-east-1
 - [ ] imported certificateは自動更新対象ではない
 - [ ] ステートフルinspectionでは対称ルーティングが重要
@@ -745,6 +773,8 @@ Route 53 aliasでCloudFrontへ向ける
 - [Rule actions in DNS Firewall](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dns-firewall-rule-actions.html)
 - [DNS Firewall Foundational Rules](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dns-firewall-domain-lists.html)
 - [What is AWS Certificate Manager?](https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html)
+- [What is AWS Private CA?](https://docs.aws.amazon.com/privateca/latest/userguide/PcaWelcome.html)
+- [Conditions for using AWS Private CA to sign ACM private certificates](https://docs.aws.amazon.com/acm/latest/userguide/ca-access.html)
 - [AWS Certificate Manager DNS validation](https://docs.aws.amazon.com/acm/latest/userguide/dns-validation.html)
 - [Managed certificate renewal in AWS Certificate Manager](https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html)
 - [Requirements for using SSL/TLS certificates with CloudFront](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cnames-and-https-requirements.html)

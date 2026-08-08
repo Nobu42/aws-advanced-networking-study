@@ -24,6 +24,7 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | Direct Connect Transit VIF MTU | `8500` | TGW経由のJumbo Frame |
 | Gateway Load Balancer | Geneve `UDP 6081` | GWLB/GWLBE/セキュリティアプライアンス |
 | Global Accelerator | 固定Anycast IPv4を2つ | 固定IP、グローバル低遅延、許可リスト |
+| NAT Gateway idle timeout | `350` 秒 | 長時間アイドル接続の切断、アプリ側keepalive |
 | BGP | TCP `179` | DX/VPNのBGPセッション |
 | DNS | TCP/UDP `53` | Route 53 Resolver、ハイブリッドDNS |
 | HTTPS | TCP `443` | ALB、CloudFront、PrivateLink、エンドポイント |
@@ -33,6 +34,8 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | ESP | IP protocol `50` | IPsec通信 |
 | VPC Flow Logs protocol | `1=ICMP`, `6=TCP`, `17=UDP` | Flow Logs読解 |
 | AWS ASN | `7224` | Direct ConnectのBGP communityでよく出る |
+| DX local preference community | `7224:7100`, `7224:7200`, `7224:7300` | AWSからオンプレへの戻り経路優先度 |
+| DX public VIF scope community | `7224:9100`, `7224:9200`, `7224:9300` | AWSパブリックプレフィックスの広告範囲 |
 
 ## 最優先で暗記する用語
 
@@ -45,6 +48,9 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | NAT Gateway | Private Subnetから外へ出るためのNAT | インバウンド開始通信は不可。AZごと配置が基本 |
 | Internet Gateway | VPCのインターネット出入口 | Public Subnetには `0.0.0.0/0 -> IGW` が必要 |
 | Egress-only Internet Gateway | IPv6の外向き専用出口 | IPv6版の片方向インターネット出口 |
+| ENI | 仮想ネットワークインターフェイス | SG、Private IP、Source/Destination Checkの単位 |
+| ENA | EC2の高性能ネットワークアダプター | EC2性能不足、拡張ネットワーキング |
+| EFA | HPC/ML向け低レイテンシー通信 | 分散処理、MPI、同一AZ配置 |
 | VPC Endpoint | AWSサービスへプライベート接続 | Gateway型とInterface型を区別 |
 | Gateway Endpoint | S3/DynamoDB向けエンドポイント | ルートテーブルにprefix list経路 |
 | Interface Endpoint | PrivateLinkのENI型エンドポイント | サブネット内ENI、SGで制御 |
@@ -67,6 +73,7 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | 用語 | 覚えること |
 | :--- | :--- |
 | Site-to-Site VPN | インターネット経由のIPsec VPN。1接続2トンネル |
+| Client VPN | 利用者端末からAWSへ接続するリモートアクセスVPN |
 | Accelerated VPN | Global Acceleratorを使うVPN。TGW接続で利用。既存VPNに後からONではなく新規作成して切替 |
 | Direct Connect | 専用線接続。安定した帯域/低遅延/閉域寄り |
 | DX Connection | 物理的なDirect Connect接続 |
@@ -83,6 +90,8 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | MED | BGP属性。優先度はLocal PreferenceやAS_PATHより低め |
 | ECMP | 同じコストの複数経路で負荷分散 |
 | BFD | BGP障害検知を速くする仕組み |
+| SiteLink | Direct Connectロケーション間で拠点間通信を行う機能 |
+| TGW Multicast | TGWで一対多配信を扱う機能。Multicast Domain/Group/Source/Member |
 
 ## DNS
 
@@ -98,6 +107,7 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | Split-horizon DNS | 同じ名前を内部/外部で違う答えにする |
 | DNS Firewall | Route 53 Resolverでドメイン単位にブロック/許可 |
 | DNSSEC | DNS応答の正当性検証 |
+| Cloud Map | サービスディスカバリ。サービス名から動的に宛先を発見 |
 
 ## Edge / Load Balancing
 
@@ -109,6 +119,8 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | CloudFront | CDN。キャッシュ、エッジ配信、WAF連携 |
 | Global Accelerator | キャッシュしない。固定Anycast IP、経路最適化、ALB/NLB/EC2/EIPへ |
 | Anycast | 同じIPを複数拠点から広告し、近い入口へ誘導 |
+| API Gateway Private API | VPC内からInterface Endpoint経由でAPIを呼ぶ |
+| API Gateway VPC Link | API GatewayからVPC内のPrivateなALB/NLB/バックエンドへ接続 |
 | Listener | LBの待ち受けプロトコル/ポート設定 |
 | Target Group | LBの転送先グループ |
 | X-Forwarded-For | 元クライアントIPをHTTPヘッダーで伝える |
@@ -119,6 +131,7 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | :--- | :--- |
 | VPC Flow Logs | ENI/Subnet/VPCの通信メタデータ。パケット中身は見ない |
 | Reachability Analyzer | 到達性の静的解析 |
+| Route Analyzer | TGW Route Tableの経路解析 |
 | Traffic Mirroring | 実パケットを複製して解析 |
 | CloudTrail | API操作履歴 |
 | CloudWatch | メトリクス、ログ、アラーム |
@@ -130,6 +143,8 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | Network Firewall | VPC単位のネットワークFirewall |
 | Kinesis Data Firehose | ログをS3/OpenSearch/Splunkなどへ配送 |
 | Athena | S3上のログをSQLで分析 |
+| Trusted Advisor | クォータ、冗長化、セキュリティ、コストなどの健全性確認 |
+| Well-Architected Tool | 設計レビューと改善計画 |
 
 ## 暗記優先順位
 
@@ -142,7 +157,9 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 7. Route 53 ResolverのInbound/Outbound
 8. Global AcceleratorとCloudFrontの違い
 9. Network Firewall、GWLB、Geneve、Suricata
-10. Flow Logs、Reachability Analyzer、Traffic Mirroring、Athena
+10. API Gateway Private API / VPC Link、Cloud Map
+11. Client VPN、SiteLink、TGW Multicast
+12. Flow Logs、Reachability Analyzer、Route Analyzer、Traffic Mirroring、Athena
 
 ## 試験での見抜き方
 
@@ -154,6 +171,10 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | VPC間でCIDR重複 | PrivateLink |
 | S3/DynamoDBへプライベート接続 | Gateway Endpoint |
 | その他AWSサービスへプライベート接続 | Interface Endpoint |
+| 利用者端末からAWSへVPN | Client VPN |
+| APIをVPC内だけから呼ばせたい | API Gateway Private API + Interface Endpoint |
+| API GatewayからPrivate Subnetのバックエンドへ | VPC Link |
+| サービス名で動的に宛先を見つける | AWS Cloud Map |
 | オンプレからVPC内DNS | Route 53 Resolver inbound endpoint |
 | VPCからオンプレDNS | Route 53 Resolver outbound endpoint |
 | IDS/IPS、Suricata、ドメイン検査 | AWS Network Firewall |
@@ -162,6 +183,10 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）で、問題文を読�
 | VPNの遅延や不安定なインターネット経路 | Accelerated Site-to-Site VPN |
 | 専用線、安定帯域、BGP | Direct Connect |
 | 経路を優先/非優先にしたい | BGP属性、Local Preference、AS_PATH prepend |
+| TGW Route Tableの経路を確認したい | Route Analyzer |
+| VPC内のSG/NACL/Route込みで到達性確認 | Reachability Analyzer |
+| HPC、MPI、機械学習クラスター | EFA |
+| サービスクォータや冗長化の健全性確認 | Trusted Advisor |
 
 ## 公式参照
 

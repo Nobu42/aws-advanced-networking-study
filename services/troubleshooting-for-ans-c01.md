@@ -336,6 +336,7 @@ TGWでは、VPCルートとTGWルートの両方を見る。
 | Return path | 戻り経路もTGWへ向いているか |
 | Attachment subnet | 対象AZにTGW attachment subnetがあるか |
 | Appliance mode | stateful appliance経由なら有効化されているか |
+| Route Analyzer | TGW Route Table上で期待するAttachmentへ経路があるか |
 
 よくある失敗:
 
@@ -344,6 +345,14 @@ VPC route tableだけ設定して、TGW route tableを設定していない。
 TGW route propagationを有効にしたが、association先が違う。
 戻り経路が別attachmentへ向いている。
 blackhole routeが最長一致している。
+```
+
+使い分け:
+
+```text
+TGW Route Table内の経路確認 = Route Analyzer
+VPC内のRoute/SG/NACL込みの到達性確認 = Reachability Analyzer
+実際に流れた通信の確認 = VPC Flow Logs
 ```
 
 ## TGW Appliance Modeと非対称ルーティング
@@ -420,6 +429,42 @@ AWSサービスへprivate接続 = VPC Endpoint
 自社/他社サービスをprivate公開 = Endpoint Service + PrivateLink
 DNSがpublic endpointへ向く = Private DNS設定を疑う
 ```
+
+## API Gateway Private API / VPC Linkのトラブルシューティング
+
+API Gatewayは、Private APIとVPC Linkで通信の向きが逆になる。
+
+```text
+Private API:
+  VPC内クライアント -> execute-api Interface Endpoint -> API Gateway
+
+VPC Link:
+  API Gateway -> VPC Link -> private ALB/NLB/backend
+```
+
+### Private API
+
+確認ポイント:
+
+| 観点 | 確認 |
+| :--- | :--- |
+| Interface Endpoint | `execute-api` のInterface Endpointがavailableか |
+| Private DNS | private DNSが有効か、または正しいendpoint DNS名を使っているか |
+| Resource policy | 対象VPC/VPC Endpointからの呼び出しを許可しているか |
+| Security Group | endpoint ENIのSGがクライアントからTCP 443を許可しているか |
+| DNS | public endpointではなくprivate endpointへ解決しているか |
+
+### VPC Link
+
+確認ポイント:
+
+| 観点 | 確認 |
+| :--- | :--- |
+| VPC Link状態 | availableか |
+| Backend | ALB/NLBのlistener、target group、health checkが正常か |
+| Security Group | ALBやbackendのSGがVPC Link経由の通信を許可しているか |
+| Route/NACL | Private Subnet内で戻り通信も成立するか |
+| Timeout | API Gateway、LB、backendのtimeoutや5xxを確認する |
 
 ## Route 53 / Resolver / DNSのトラブルシューティング
 
@@ -901,11 +946,14 @@ return path
 | NAT | private subnetから外へ出られない | NAT GW、IGW、route、NACL、DNS |
 | Peering | peer VPCへ行けない | 両側route、CIDR重複、SG/NACL、推移的不可 |
 | TGW | VPC間通信不可 | association、propagation、blackhole、VPC route |
+| TGW | TGW内の出口が分からない | Route Analyzer、association、propagation |
 | Inspection | 通信が断続的 | appliance mode、非対称routing、AZ |
 | VPN | tunnel down | IKE、IPsec、PSK、UDP 500/4500 |
 | VPN | tunnel upだが通信不可 | BGP/static route、propagation、戻り経路 |
 | DX | BGP down | VLAN、peer IP、ASN、MD5、TCP 179 |
 | DNS | 名前解決不可 | PHZ、Resolver endpoint/rule、VPC DNS属性 |
+| API Gateway | Private APIへ到達できない | execute-api endpoint、private DNS、resource policy、SG |
+| API Gateway | private backendへ到達できない | VPC Link、ALB/NLB listener、target health、SG |
 | ALB | target unhealthy | health check、SG、NACL、app |
 | CloudFront | 403 | S3権限、OAC/OAI、WAF、object key |
 | Firewall | 期待通り遮断しない | route、rule priority、stateful/stateless、logs |
@@ -923,6 +971,8 @@ return path
 | SGだけ見て戻り通信を判断する | SGはstateful。戻りで詰まるならNACL、route、firewallも見る |
 | Network Firewallで非対称routingでもstateful inspectionできる | stateful機能は対称経路が前提 |
 | Reachability Analyzerでアプリ応答を確認する | 静的なネットワーク到達性の分析であり、HTTP応答確認ではない |
+| Route AnalyzerでVPC内のSG/NACLまで検証する | Route AnalyzerはTGW Route Table中心。VPC内はReachability Analyzer |
+| Private APIとVPC Linkを同じものとして扱う | Private APIはVPCからAPI Gatewayへ、VPC LinkはAPI GatewayからVPC内backendへ |
 | DNS Query LoggingでDNSをブロックする | Query Loggingは記録。ブロックはDNS Firewall |
 
 ## 試験前チェックリスト
@@ -930,6 +980,7 @@ return path
 - 通信不可時にRoute Table、SG、NACL、DNS、戻り経路を順番に確認できる
 - VPC Flow Logsの`ACCEPT`、`REJECT`、`NODATA`、`SKIPDATA`を説明できる
 - Reachability AnalyzerとVPC Flow Logsの違いを説明できる
+- Route AnalyzerはTGW Route Tableの経路確認向けだと説明できる
 - CloudTrailとAWS Configの使い分けを説明できる
 - public subnetとprivate subnetのインターネット経路を説明できる
 - NAT Gatewayのidle timeout 350秒を覚えている
@@ -942,6 +993,7 @@ return path
 - ALBの502/503/504の代表原因を説明できる
 - CloudFrontの403/502/504の代表原因を説明できる
 - DNS障害でPHZ、Resolver endpoint、Resolver rule、TTLを確認できる
+- API Gateway Private APIとVPC Linkの通信方向の違いを説明できる
 
 ## 公式ドキュメント
 
@@ -953,6 +1005,7 @@ return path
 - [Troubleshoot a VPC peering connection](https://docs.aws.amazon.com/vpc/latest/peering/troubleshoot-vpc-peering-connections.html)
 - [Amazon VPC attachments in AWS Transit Gateway](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-vpc-attachments.html)
 - [How AWS Transit Gateway works](https://docs.aws.amazon.com/vpc/latest/tgw/how-transit-gateways-work.html)
+- [Route Analyzer for AWS Network Manager](https://docs.aws.amazon.com/network-manager/latest/tgwnm/route-analyzer.html)
 - [Avoiding asymmetric routing with AWS Network Firewall](https://docs.aws.amazon.com/network-firewall/latest/developerguide/asymmetric-routing.html)
 - [Troubleshooting general issues in AWS Network Firewall](https://docs.aws.amazon.com/network-firewall/latest/developerguide/troubleshooting-general-issues.html)
 - [Troubleshooting AWS Site-to-Site VPN customer gateway device](https://docs.aws.amazon.com/vpn/latest/s2svpn/Troubleshooting.html)
@@ -963,3 +1016,5 @@ return path
 - [Troubleshooting error response status codes in CloudFront](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/troubleshooting-response-errors.html)
 - [What is Route 53 VPC Resolver?](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver.html)
 - [AWS PrivateLink concepts](https://docs.aws.amazon.com/vpc/latest/privatelink/concepts.html)
+- [Create a private API](https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-private-api-create.html)
+- [Private integrations for REST APIs in API Gateway](https://docs.aws.amazon.com/apigateway/latest/developerguide/private-integration.html)

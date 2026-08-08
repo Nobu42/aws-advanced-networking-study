@@ -101,6 +101,31 @@ external users
 registered domain
 ```
 
+## Domain Registration / Delegation
+
+Route 53はDNSホスティングだけでなく、ドメイン登録にも使える。
+
+ただし試験では、次の2つを分けて考える。
+
+| 項目 | 意味 |
+| :--- | :--- |
+| Domain registration | `example.com` というドメインをレジストラで登録する |
+| Public Hosted Zone | `example.com` のDNSレコードをRoute 53で管理する |
+| Delegation | レジストラ側で、Route 53 Hosted ZoneのNSレコードを権威DNSとして指定する |
+
+重要ポイント:
+
+- Public Hosted Zoneを作成するとNSレコードが割り当てられる
+- インターネットからRoute 53のレコードを見せるには、ドメインのNS委任がRoute 53 Hosted ZoneのNSへ向いている必要がある
+- ドメイン登録がRoute 53以外でも、NSをRoute 53へ委任すればRoute 53でDNS管理できる
+- 親ドメインから子ドメインへ委任する場合もNSレコードを使う
+
+ひっかけ:
+
+- Hosted Zoneにレコードを追加しただけでは、レジストラ側NSが別DNSを向いていると外部利用者には反映されない
+- TTLが長いと変更反映に時間がかかる
+- DNS移行では、古いDNSと新しいRoute 53 Hosted Zoneの両方に必要レコードが揃っているか確認する
+
 ## Private Hosted Zone
 
 Private Hosted Zoneは、VPC内向けのDNSゾーンである。
@@ -477,10 +502,30 @@ DNS名で複数宛先を返す = Route 53
 固定IP + 低遅延 + TCP/UDP入口最適化 = Global Accelerator
 ```
 
+## DNSSEC / DNS Delegationの注意
+
+DNSSECは、DNS応答が改ざんされていないことを検証する仕組みである。
+
+覚えること:
+
+| 用語 | 意味 |
+| :--- | :--- |
+| Zone signing | Hosted Zone内のDNSレコードに署名する |
+| KSK | Key Signing Key。DNSSECの信頼の起点側で使う鍵 |
+| DS record | 親ゾーンに登録し、子ゾーンの鍵を信頼させるためのレコード |
+| Validation | Resolver側が署名を検証すること |
+
+試験での見方:
+
+- 「DNS応答の改ざん検知」「DNSの信頼性」「署名」という表現ならDNSSECを疑う
+- Public Hosted ZoneのDNSSECでは、親ゾーン/レジストラ側のDSレコード登録が必要になる
+- Private Hosted Zoneの名前解決や転送設計は、DNSSECよりResolver Endpoint/Resolver Ruleの論点になりやすい
+
 ## よくある失敗パターン
 
 | 症状 | 原因候補 |
 | :--- | :--- |
+| Public Hosted Zoneにレコードを作ったが外部から解決できない | レジストラ/親ゾーンのNS委任がRoute 53 Hosted Zoneを向いていない |
 | PHZの名前が解決できない | VPC関連付け漏れ、enableDnsHostnames/enableDnsSupport無効 |
 | オンプレからPHZを引けない | Inbound endpoint未構成、オンプレDNS forwarder未設定 |
 | VPCからオンプレDNSを引けない | Outbound endpointまたはResolver rule未設定 |
@@ -503,11 +548,14 @@ Split-horizon DNS   = 同じ名前で内部/外部の答えを変える
 DNS Firewall        = VPCのDNS問い合わせをドメイン名で制御
 Alias record        = Zone apexでもAWSリソースへ向けられる
 Health check        = DNSフェイルオーバー判断
+Delegation          = 親ゾーン/レジストラからNSで委任
+DNSSEC              = DNS応答の署名/検証、KSKとDS
 ```
 
 ## 試験直前チェック
 
 - [ ] Public Hosted ZoneとPrivate Hosted Zoneの違いを説明できる
+- [ ] Public Hosted Zone作成とドメインNS委任の違いを説明できる
 - [ ] Inbound endpointとOutbound endpointの向きを間違えない
 - [ ] Resolver ruleはOutbound endpointとセットで考える
 - [ ] オンプレからVPC+2へ直接問い合わせる設計を選ばない
@@ -519,10 +567,14 @@ Health check        = DNSフェイルオーバー判断
 - [ ] Route 53 Health CheckはPrivate IPを直接チェックできない
 - [ ] DNS FirewallはDNS問い合わせを制御し、HTTPS通信そのものを検査するものではない
 - [ ] Resolver query loggingとPublic DNS query loggingの対象を区別できる
+- [ ] DNSSECは署名/検証、KSK、DSレコードの関係で覚える
 
 ## 公式参照
 
 - [Amazon Route 53 concepts](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/route-53-concepts.html)
+- [What is Amazon Route 53?](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/Welcome.html)
+- [Registering and managing domains using Amazon Route 53](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/registrar.html)
+- [Registering a new domain](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-register.html)
 - [Choosing a routing policy](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html)
 - [Working with hosted zones](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-working-with.html)
 - [Working with private hosted zones](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-private.html)
@@ -531,4 +583,5 @@ Health check        = DNSフェイルオーバー判断
 - [Resolver endpoints and forwarding rules](https://docs.aws.amazon.com/whitepapers/latest/hybrid-cloud-dns-options-for-vpc/route-53-resolver-endpoints-and-forwarding-rules.html)
 - [Resolver query logging](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html)
 - [Resolver DNS Firewall](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dns-firewall-overview.html)
+- [Enabling DNSSEC signing and establishing a chain of trust](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec-enable-signing.html)
 - [Configuring failover in a private hosted zone](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover-private-hosted-zones.html)

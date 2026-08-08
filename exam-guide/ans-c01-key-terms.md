@@ -159,6 +159,82 @@ IPv6用の外向き専用ゲートウェイ。
 - IPv4のNAT Gatewayとは用途が違う
 - IPv6の `::/0` routeと一緒に問われることが多い
 
+### Elastic Network Interface
+
+ENIはEC2や一部AWSサービスに接続される仮想ネットワークインターフェイス。
+
+重要ポイント:
+
+- Security GroupはENIに関連付く
+- Private IP、Elastic IP、MACアドレス、Source/Destination Checkなどが関係する
+- 複数ENIを持つEC2は、管理用/データ用など通信経路を分けられる
+- Interface Endpoint、Lambda VPC接続、NAT Instance、Firewall Applianceの理解にも関係する
+
+ひっかけ:
+
+- EC2インスタンスそのものではなく、通信の入口はENIとして考える
+- 複数ENIや複数Route Tableを使う構成では、戻り経路とSource/Destination Checkに注意する
+
+### Elastic Network Adapter
+
+ENAはEC2の高性能ネットワークアダプター。
+
+重要ポイント:
+
+- 高スループット、低レイテンシー、拡張ネットワーキングの文脈で出る
+- EC2インスタンスタイプが対応している必要がある
+- ネットワーク性能不足の切り分けでは、インスタンスタイプ、ENA対応、OSドライバー、PPS/帯域制限を確認する
+
+ひっかけ:
+
+- ENAは通信方式そのものではなく、EC2ネットワーク性能を支えるアダプター
+- VPC接続サービスであるTGW、VPN、DXとは役割が違う
+
+### Elastic Fabric Adapter
+
+EFAはHPCや機械学習など、低レイテンシー・高スループットが必要な分散処理向けネットワークインターフェイス。
+
+重要ポイント:
+
+- EC2間の高性能通信に使う
+- 対応インスタンス、対応AMI/ドライバー、同一AZ配置などが重要
+- HPC、MPI、機械学習クラスターの問題文で出やすい
+
+ひっかけ:
+
+- 一般的なWebシステムの高速化ではなく、ノード間通信が重い計算基盤向け
+- CloudFrontやGlobal Acceleratorのようなエッジ最適化サービスではない
+
+### Secondary CIDR
+
+既存VPCに追加できるCIDRブロック。
+
+重要ポイント:
+
+- IPアドレス不足への対応で出る
+- 既存VPC CIDRや接続先ネットワークと重複してはいけない
+- 追加後、Subnetを新しいCIDRから作成して利用する
+- IPAMと組み合わせると、複数アカウント/複数リージョンのアドレス管理がしやすい
+
+ひっかけ:
+
+- CIDRを追加しても既存Subnetのサイズが自動で広がるわけではない
+- Peering、TGW、VPN、DX先との重複確認が必要
+
+### DHCP Options Set
+
+VPC内インスタンスが使うDNSサーバーやドメイン名などのDHCP設定。
+
+重要ポイント:
+
+- AmazonProvidedDNS、オンプレミスDNS、独自ドメイン名の設定で関係する
+- ハイブリッドDNS設計でRoute 53 Resolverと一緒に問われる
+
+ひっかけ:
+
+- Route 53 Hosted Zoneそのものではない
+- 設定変更後、既存インスタンス側の反映タイミングにも注意する
+
 ## 2. セキュリティ境界
 
 ### Security Group
@@ -333,6 +409,7 @@ AWS Organizations内で、1つのVPC/Subnetを複数アカウントに共有す�
 ひっかけ:
 
 - VPC PeeringやTGWのようにVPC同士を接続する機能ではない
+- アカウント間のネットワークを増やすより、中央のネットワークアカウントでSubnetを共用したい要件に向く
 
 ### AWS RAM
 
@@ -539,6 +616,36 @@ AWSのCDNサービス。
 - CloudFrontはCDN、Global Acceleratorはグローバル入口・ネットワーク経路最適化
 - DNSベースのRoute 53フェイルオーバーとは切り替え方式が違う
 
+### Amazon API Gateway
+
+APIの公開、認証、スロットリング、ルーティングを提供するマネージドサービス。
+
+重要ポイント:
+
+- REST API、HTTP API、WebSocket APIの文脈で出る
+- CloudFront、WAF、ACM、Route 53と組み合わせることがある
+- Private APIはVPC内からInterface Endpoint経由でアクセスさせる構成が重要
+
+ひっかけ:
+
+- API Gatewayはロードバランサーではない
+- VPC内のプライベートなALB/NLB/サービスへ接続する場合はVPC Linkの要件を確認する
+
+### API Gateway VPC Link
+
+API GatewayからVPC内のプライベートなバックエンドへ接続するための仕組み。
+
+重要ポイント:
+
+- API Gatewayを入口にし、VPC内のNLB/ALBやプライベートサービスへ流す構成で使う
+- 「APIは公開したいが、バックエンドはPrivate Subnetに置きたい」という問題で出やすい
+- Security Group、NACL、バックエンドのリスナー、Route Tableを合わせて確認する
+
+ひっかけ:
+
+- Private APIとVPC Linkは逆向きに混同しやすい
+- Private APIは「クライアントがVPCからAPI Gatewayへ入る」、VPC Linkは「API GatewayがVPC内バックエンドへ入る」
+
 ## 7. Hybrid Connectivity
 
 ### AWS Site-to-Site VPN
@@ -677,6 +784,50 @@ Global Acceleratorを利用してVPN接続の性能を改善するSite-to-Site V
 
 - Direct Connectの代替ではなく、VPNの改善オプションとして理解する
 
+### AWS Client VPN
+
+利用者端末からAWSまたはオンプレミスへ安全に接続するためのマネージドリモートアクセスVPN。
+
+重要ポイント:
+
+- Site-to-Site VPNは拠点間、Client VPNはユーザー端末からのリモートアクセス
+- 認証、認可ルール、クライアントCIDR、関連付けSubnet、ルートが重要
+- 在宅勤務、運用担当者の管理アクセス、開発者アクセスの問題で出やすい
+
+ひっかけ:
+
+- オンプレミス拠点ルーターとAWSを結ぶ用途ならSite-to-Site VPN
+- Client VPNを作るだけでは到達できず、Authorization RuleとRouteが必要
+
+### Direct Connect SiteLink
+
+Direct Connectロケーション間でオンプレミス拠点同士を接続できる機能。
+
+重要ポイント:
+
+- AWSリージョン内VPCを経由せず、DXロケーション間の拠点間通信に使う
+- グローバルWANの一部としてAWSバックボーンを使いたい要件で出る
+
+ひっかけ:
+
+- VPC接続のためのPrivate VIF/Transit VIFとは目的が違う
+- すべてのDX構成で自動的に有効になるわけではない
+
+### Transit Gateway Multicast
+
+Transit GatewayでVPC内のマルチキャスト通信を扱う機能。
+
+重要ポイント:
+
+- Multicast Domain、Group、Source、Memberを理解する
+- 金融配信、映像配信、HPCなど一対多配信の問題文で出ることがある
+- 通常のユニキャスト経路とは別物として考える
+
+ひっかけ:
+
+- TGWを使えばすべてのAttachmentへマルチキャストできる、とは考えない
+- Direct Connect、Site-to-Site VPN、TGW Peeringなどでのサポート可否を確認する
+
 ## 8. 監視・調査
 
 ### VPC Flow Logs
@@ -732,6 +883,48 @@ TGWを中心としたグローバルネットワークの可視化・管理サ�
 ひっかけ:
 
 - 経路を自動修復する魔法の機能ではなく、可視化・管理の文脈で理解する
+
+### Route Analyzer
+
+Transit Gateway Route Tableの経路を分析し、TGW内で宛先へ届くかを確認する機能。
+
+重要ポイント:
+
+- TGW Route TableのAssociation、Propagation、Static Routeの確認に向く
+- どのAttachmentを通るか、TGW内で経路が存在するかを見る
+
+ひっかけ:
+
+- VPC内のSecurity Group、NACL、Subnet Route Table、OS Firewallまでは検証しない
+- VPCレベルの到達性はReachability Analyzerと使い分ける
+
+### AWS Trusted Advisor
+
+AWS環境のコスト、セキュリティ、耐障害性、パフォーマンス、サービスクォータなどをチェックするサービス。
+
+重要ポイント:
+
+- Direct ConnectやVPNなどの冗長化、サービス制限、公開リソースの検出などで候補になる
+- 運用・継続改善・アカウント全体の健全性確認で使う
+
+ひっかけ:
+
+- 個別パケットの通信ログや経路ログを出すサービスではない
+- 詳細な通信切り分けはFlow Logs、Reachability Analyzer、CloudWatchメトリクスなどを使う
+
+### AWS Well-Architected Tool
+
+Well-Architected Frameworkに沿ってアーキテクチャをレビューするためのツール。
+
+重要ポイント:
+
+- 信頼性、セキュリティ、パフォーマンス効率、コスト最適化、運用上の優秀性などを確認する
+- ネットワーク設計では冗長化、帯域、レイテンシー、障害分離、監視の観点で出る
+
+ひっかけ:
+
+- 自動でネットワーク設定を変更するサービスではない
+- 設計レビューや改善計画の文脈で選ぶ
 
 ### CloudWatch
 
@@ -800,7 +993,50 @@ TLS証明書を管理するサービス。
 
 - Private CAが必要な場合はACM PCAを検討する
 
+### AWS Private Certificate Authority
+
+ACM Private CAは、社内向け・プライベート用途の証明書を発行するためのマネージドCA。
+
+重要ポイント:
+
+- 内部ALB、プライベートAPI、mTLS、社内サービス間TLSなどで使う
+- パブリックに信頼される証明書ではなく、組織内の信頼基盤として考える
+- ACMで証明書管理し、Private CAで発行元を管理する関係
+
+ひっかけ:
+
+- インターネット公開サイトの一般的な証明書は通常ACMのパブリック証明書
+- Private CAはコストと運用設計も問われる
+
 ## 10. コンテナ・アプリケーションネットワーク
+
+### Amazon ECS
+
+コンテナを実行・管理するAWSのコンテナオーケストレーションサービス。
+
+重要ポイント:
+
+- EC2起動タイプとFargate起動タイプがある
+- awsvpcネットワークモードではタスクにENIが割り当てられる
+- ALB/NLB、Service Discovery、Cloud Map、Security Group、Subnet設計と関係する
+
+ひっかけ:
+
+- コンテナ通信でも、最終的にはVPC/Subnet/ENI/Security Groupの理解が必要
+
+### AWS Fargate
+
+サーバー管理なしでECS/EKSのコンテナを実行するコンピュート実行環境。
+
+重要ポイント:
+
+- EC2インスタンス管理をAWS側に任せられる
+- タスク/Pod単位のENI、Security Group、Subnet選択が重要
+- Private Subnet配置時は、イメージ取得や外向き通信のためにNAT GatewayまたはVPC Endpointを検討する
+
+ひっかけ:
+
+- サーバー管理不要でも、ネットワーク設計は不要にならない
 
 ### Amazon EKS
 
@@ -840,6 +1076,21 @@ EKSからALB/NLBを作成・管理するController。
 
 - VPC間接続そのものを提供するサービスではない
 
+### AWS Cloud Map
+
+クラウドリソースやマイクロサービスの名前解決・サービスディスカバリを提供するサービス。
+
+重要ポイント:
+
+- ECS、EKS、App Mesh、Route 53と組み合わせて出る
+- サービス名から動的にエンドポイントを発見する
+- Private DNS Namespaceを使うとVPC内サービス名解決に使える
+
+ひっかけ:
+
+- Cloud Mapは名前解決/サービス発見であり、通信経路そのものを作るわけではない
+- DNSが解決しても、Security GroupやRouteがなければ通信できない
+
 ## 11. 試験で迷いやすい比較
 
 | 要件 | 第一候補 | 比較対象 |
@@ -857,6 +1108,16 @@ EKSからALB/NLBを作成・管理するController。
 | TCP/UDPのL4高性能LB | NLB | ALB |
 | セキュリティアプライアンスを透過挿入 | Gateway Load Balancer | ALB、NLB |
 | ステートフル検査の集中構成 | TGW Appliance Mode | 通常TGW Attachment |
+| ユーザー端末からAWSへVPN接続 | Client VPN | Site-to-Site VPN |
+| 拠点ルーターとAWSをVPN接続 | Site-to-Site VPN | Client VPN |
+| VPC内からAPI GatewayをPrivateに呼ぶ | Private API + Interface Endpoint | Public API |
+| API GatewayからVPC内バックエンドへ接続 | VPC Link | PrivateLink、NAT Gateway |
+| サービス名で動的に宛先発見 | Cloud Map | 手動DNSレコード |
+| HPC/MLの低レイテンシーEC2間通信 | EFA | ENA、Global Accelerator |
+| EC2の一般的な高性能ネットワーク | ENA | EFA |
+| TGW Route Tableの経路確認 | Route Analyzer | Reachability Analyzer |
+| アカウント全体の健全性/クォータ確認 | Trusted Advisor | CloudWatch |
+| 設計レビューと改善計画 | Well-Architected Tool | Config、Trusted Advisor |
 | API操作履歴 | CloudTrail | Flow Logs |
 | IP通信の許可/拒否ログ | VPC Flow Logs | CloudTrail |
 | パケット内容の詳細解析 | Traffic Mirroring | Flow Logs |
@@ -882,6 +1143,11 @@ BGPは動的経路交換。
 CloudFrontはCDN、Global AcceleratorはAnycast入口。
 CloudTrailはAPI操作履歴、Flow LogsはIP通信ログ。
 Reachability Analyzerは実通信なしの到達性分析。
+TGW内の経路確認はRoute Analyzer。
+Client VPNは利用者端末、Site-to-Site VPNは拠点間。
+Private APIはVPCからAPI Gateway、VPC LinkはAPI GatewayからVPC内バックエンド。
+Cloud Mapはサービス発見。
+ENAはEC2の高性能NIC、EFAはHPC/ML向け低レイテンシー通信。
 ```
 
 ## 13. 復習の進め方

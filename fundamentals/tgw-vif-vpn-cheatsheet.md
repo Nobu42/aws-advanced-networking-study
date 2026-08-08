@@ -72,6 +72,7 @@ VPC間 / AWS環境間
 | VPCからAWS APIへprivate接続したい | Interface VPC Endpoint |
 | 複数アカウントでTGWやsubnetなどを共有したい | AWS RAM |
 | リモートユーザーがAWS/オンプレへVPN接続したい | AWS Client VPN |
+| 一対多のmulticast配信をしたい | Transit Gateway Multicast |
 
 ## 接続方式の選択表
 
@@ -86,6 +87,7 @@ VPC間 / AWS環境間
 | オンプレ - AWS public service | Public VIF | S3などpublic endpointへDX経由 | VPCへ入る用途ではない |
 | リモート端末 - AWS/オンプレ | AWS Client VPN | ユーザー単位のリモートアクセス | Site-to-Site VPNとは用途が違う |
 | 検査VPC経由通信 | TGW + GWLB/GWLBE + Appliance Mode | firewall/IDS/IPS集中検査 | 非対称ルーティングに注意 |
+| 一対多配信 | TGW Multicast | 金融データ配信、映像配信、HPCなど | 通常のユニキャスト経路とは別に設計 |
 
 ## ANS-C01での優先度
 
@@ -417,6 +419,25 @@ TGW Peeringは、TGW同士を接続する仕組みである。
 | 伝播 | TGW Peering経由の自動伝播には注意 |
 | 推移的接続 | 設計上、意図しない推移的ルーティングを期待しない |
 
+## Transit Gateway Multicast
+
+Transit Gateway Multicastは、TGWを使ってVPC内のマルチキャスト通信を扱う機能である。
+
+覚えること:
+
+| 項目 | 内容 |
+| :--- | :--- |
+| 用途 | 一対多配信、金融データ配信、映像配信、HPCなど |
+| 構成要素 | Multicast Domain、Group、Source、Member |
+| メンバー管理 | IGMP、または静的なメンバー登録 |
+| 経路 | 通常のユニキャストRoute Tableとは別に考える |
+
+試験での注意:
+
+- TGWの通常Attachmentを作れば自動的にマルチキャストできる、とは考えない
+- Direct Connect、Site-to-Site VPN、TGW Peering、TGW Connectなどの接続先までマルチキャストを延伸できるかはサポート可否を確認する
+- ほとんどのANS-C01問題では、単純なVPC間接続ではなく「一対多配信」「multicast」という単語が選択の合図になる
+
 ## VPC Peering
 
 VPC Peeringは、2つのVPCをprivate IPで直接接続する仕組みである。
@@ -604,7 +625,21 @@ Transit Gateway Network Managerは、TGWを含むグローバルネットワー�
 | :--- | :--- |
 | TGW中心のネットワークトポロジーを可視化 | Transit Gateway Network Manager |
 | 複数リージョン/複数拠点の接続状態を把握 | Network Manager |
-| 経路や到達性を詳細に切り分け | Reachability Analyzer / TGW route table / Flow Logs |
+| TGW Route Tableの経路を確認 | Route Analyzer |
+| VPC内のSG/NACL/Route込みで到達性を確認 | Reachability Analyzer |
+| 実際の通信ログを確認 | Flow Logs |
+
+### Route Analyzerとの違い
+
+Route Analyzerは、TGW Route Table上の経路確認に向く。
+
+```text
+TGW Attachment
+  -> TGW Route Table
+  -> どのAttachmentへ出るか
+```
+
+ただし、VPC内Subnet Route Table、Security Group、Network ACL、OS Firewall、DNS応答までは判定しない。
 
 ## TGW Appliance Mode
 
@@ -837,6 +872,7 @@ prefix length
 | AWS APIへprivate接続 | Interface VPC Endpoint |
 | リモートユーザーをAWSへ接続 | Client VPN |
 | 複数アカウントで中央TGWを共有 | AWS RAM |
+| 一対多配信、multicast | TGW Multicast |
 
 ## 試験での見抜き方
 
@@ -865,6 +901,8 @@ prefix length
 | 複数アカウントでTGWを共用 | AWS RAM |
 | ユーザー端末からAWSへVPN | Client VPN |
 | オンプレ拠点間をAWS backboneで接続 | Direct Connect SiteLink |
+| TGW内の経路を分析したい | Route Analyzer |
+| 一対多配信、multicast domain | TGW Multicast |
 
 ## 最小暗記セット
 
@@ -883,6 +921,8 @@ Attachment  = TGWへの接続点
 Association = 入ってきた通信が見るRoute Table
 Propagation = 経路をRoute Tableへ載せる
 Appliance Mode = ステートフル検査で往復を同じ経路へ寄せる
+Route Analyzer = TGW Route Tableの経路確認
+TGW Multicast = 一対多配信、Multicast Domain/Group/Source/Member
 ```
 
 ### VPN
@@ -921,6 +961,8 @@ Client VPN = ユーザー端末からTLS VPN
 - [Direct Connect SiteLink](https://docs.aws.amazon.com/directconnect/latest/UserGuide/dx-sitelink.html)
 - [Transit Gateway VPC attachments and appliance mode](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-vpc-attachments.html)
 - [How AWS Transit Gateway works](https://docs.aws.amazon.com/vpc/latest/tgw/how-transit-gateways-work.html)
+- [Multicast in AWS Transit Gateway](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-multicast-overview.html)
+- [Route Analyzer for AWS Network Manager](https://docs.aws.amazon.com/network-manager/latest/tgwnm/route-analyzer.html)
 - [Connect attachments and Connect peers in AWS Transit Gateway](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-connect.html)
 - [What is VPC peering?](https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html)
 - [What is AWS PrivateLink?](https://docs.aws.amazon.com/vpc/latest/privatelink/what-is-privatelink.html)

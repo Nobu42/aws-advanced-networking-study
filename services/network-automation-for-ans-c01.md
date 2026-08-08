@@ -8,6 +8,7 @@ ANS-C01で出題される「ネットワークインフラ構築・構成の自�
 
 ```text
 AWS CloudFormation
+AWS CDK
 CloudFormation StackSets
 CloudFormation Change Sets
 CloudFormation Drift Detection
@@ -29,6 +30,7 @@ Lambda
 | 要件 | 疑うサービス/機能 |
 | :--- | :--- |
 | VPC、Subnet、Route Table、TGWなどをコードで作りたい | CloudFormation |
+| TypeScript/PythonなどのコードでIaCを定義したい | AWS CDK |
 | 複数アカウント/複数リージョンへ同じネットワーク標準を展開したい | CloudFormation StackSets |
 | 変更前に何が変わるか確認したい | CloudFormation Change Sets |
 | 手動変更でテンプレートとの差分が出たか確認したい | CloudFormation Drift Detection |
@@ -53,6 +55,10 @@ Code / Template
   |      +--> Drift Detection
   |      +--> StackSets
   |      +--> Guard / Hooks
+  |
+  +--> AWS CDK
+  |      +--> synth
+  |      +--> CloudFormation template
   |
   +--> AWS CLI
   |      +--> deploy / validate / describe / detect drift
@@ -83,6 +89,7 @@ ANS-C01では、自動化を2つに分けると判断しやすい。
 
 ```text
 CloudFormation = 作る
+AWS CDK        = コードで定義してCloudFormationへ合成する
 AWS Config     = 見る・評価する・直す
 AWS CLI        = 操作をコマンド化する
 AWS SDK        = 操作をプログラム化する
@@ -135,6 +142,69 @@ AWS Network Firewall
 AWS WAF Web ACL
 ```
 
+## AWS CDK
+
+AWS CDKは、TypeScript、Python、Javaなどのプログラミング言語でAWSリソースを定義し、CloudFormationテンプレートへ合成してデプロイするIaCツールである。
+
+```text
+CDK code
+  -> cdk synth
+  -> CloudFormation template
+  -> CloudFormation stack
+```
+
+覚えること:
+
+| 項目 | 内容 |
+| :--- | :--- |
+| 主目的 | プログラミング言語でIaCを表現する |
+| 実体 | 最終的にはCloudFormation Stackとして管理される |
+| 強み | 再利用、条件分岐、Construct化、標準部品化 |
+| 注意 | 生成されるCloudFormation差分、権限、環境依存値を確認する |
+
+試験での見方:
+
+- 「コードで再利用可能なネットワーク部品を作りたい」「複数環境で同じ構成を生成したい」ならCDKを疑う
+- 「既存Stackとの差分確認」はCloudFormation Change SetsやCDK diffの文脈で考える
+- CDKだからドリフトや権限の問題が消えるわけではない
+
+## Hardcoded IaC Valuesを避ける
+
+IaCテンプレートに環境依存値を直書きすると、複数環境/複数アカウントで再利用しにくく、誤設定の原因になる。
+
+直書きしがちな値:
+
+```text
+VPC CIDR
+Subnet CIDR
+Account ID
+Region
+AMI ID
+Hosted Zone ID
+TGW ID
+Security Group ID
+Certificate ARN
+Endpoint service name
+```
+
+対策:
+
+| 方法 | 使いどころ |
+| :--- | :--- |
+| Parameters | 環境ごとに入力値を変える |
+| Mappings | リージョン/環境ごとの固定対応表を持つ |
+| Conditions | dev/prodなどで作るリソースを分ける |
+| Pseudo parameters | `AWS::AccountId`、`AWS::Region`などを動的参照する |
+| SSM Parameter Store | 共有値や環境値を外部管理する |
+| Export / ImportValue | 別StackのOutputを参照する |
+| CDK context / props | CDKで環境差分をコード側に渡す |
+
+試験での見方:
+
+- 「テンプレートが特定アカウント/リージョンに固定されて再利用できない」ならParameters、Mappings、Pseudo parametersを疑う
+- 「既存ネットワークIDを安全に参照したい」ならSSM Parameter Store、Export/ImportValue、CloudFormation Outputを考える
+- 「複数アカウントへ標準展開」はStackSets、「値の違い」はParameters/OU別設定で吸収する
+
 試験での見方:
 
 | 問題文 | 答え |
@@ -142,6 +212,8 @@ AWS WAF Web ACL
 | ネットワーク構成を再現可能にしたい | CloudFormation |
 | 手動構築ミスを減らしたい | CloudFormation |
 | dev/stg/prodで同じ構成を作りたい | CloudFormation + Parameters |
+| プログラミング言語でIaCを再利用したい | AWS CDK |
+| 環境ごとのCIDR/IDを直書きせず再利用したい | Parameters / Mappings / Pseudo parameters / SSM Parameter Store |
 | 複数アカウントへ標準VPC設定を配布したい | StackSets |
 
 ## Change Sets
@@ -637,20 +709,21 @@ AWS Config     = 作られた後も正しいか見続ける
 | 修復 | しない | 作成を止める | Remediation可能 |
 | 典型問題 | policy-as-code | 非準拠リソースのprovisioning防止 | 監査、履歴、準拠状況 |
 
-## AWS CLI / SDK / CloudFormationの違い
+## AWS CLI / SDK / CloudFormation / CDKの違い
 
-| 観点 | AWS CLI | AWS SDK | CloudFormation |
-| :--- | :--- | :--- | :--- |
-| 操作単位 | コマンド | プログラム内API | テンプレート |
-| 状態管理 | 基本的に自分で管理 | 自分で管理 | Stackとして管理 |
-| 再現性 | スクリプト次第 | 実装次第 | 高い |
-| 差分確認 | 自分でdescribe比較 | 実装次第 | Change Set / Drift Detection |
-| 向いている用途 | 運用手順、調査、単発変更 | 複雑な自動化、アプリ連携 | 標準構成の構築 |
+| 観点 | AWS CLI | AWS SDK | CloudFormation | AWS CDK |
+| :--- | :--- | :--- | :--- | :--- |
+| 操作単位 | コマンド | プログラム内API | テンプレート | プログラミング言語のコード |
+| 状態管理 | 基本的に自分で管理 | 自分で管理 | Stackとして管理 | CloudFormation Stackとして管理 |
+| 再現性 | スクリプト次第 | 実装次第 | 高い | 高い |
+| 差分確認 | 自分でdescribe比較 | 実装次第 | Change Set / Drift Detection | synth/diff後にCloudFormationで確認 |
+| 向いている用途 | 運用手順、調査、単発変更 | 複雑な自動化、アプリ連携 | 標準構成の構築 | 再利用可能なIaC部品化 |
 
 試験での判断:
 
 ```text
 長期運用する標準ネットワーク = CloudFormation
+コードでIaCを抽象化/再利用 = AWS CDK
 大量の確認/手順化 = AWS CLI
 条件分岐の多い独自処理 = AWS SDK
 準拠監査 = AWS Config
@@ -881,6 +954,8 @@ CloudFormation Hooks with FAIL mode
 | Drift DetectionはすべてのAWSリソース差分を完全検出 | 対応リソース/プロパティに依存する |
 | StackSetsは1リージョンだけの機能 | 複数アカウント/複数リージョン展開に使う |
 | AWS Configはリソースを作るサービス | 記録・評価・監査が主目的 |
+| CDKはCloudFormationとは別の状態管理をする | CDKは最終的にCloudFormation Stackを作る |
+| IaCなら値を直書きしても安全 | 環境依存値はParameters、Mappings、SSM Parameter Storeなどで外出しする |
 | Config Aggregatorでリソース修正できる | Aggregatorは集約ビューであり、変更権限を持つ仕組みではない |
 | Config Proactive evaluationは作成を止める | 評価するだけ。止めるならHooksやCI/CD制御 |
 | CLIは状態管理してくれる | CLIはAPI実行手段。状態管理は自分で行う |
@@ -890,6 +965,8 @@ CloudFormation Hooks with FAIL mode
 ## 試験直前チェック
 
 - [ ] CloudFormationはIaCでAWSリソースをStack管理する
+- [ ] AWS CDKはコードでIaCを定義し、CloudFormationへ合成する
+- [ ] IaCの環境依存値は直書きせず、Parameters、Mappings、Pseudo parameters、SSM Parameter Storeなどで扱う
 - [ ] Change Setsは更新前の差分確認
 - [ ] Drift DetectionはCloudFormation外の手動変更検出
 - [ ] StackSetsは複数アカウント/複数リージョン展開
@@ -912,6 +989,8 @@ CloudFormation Hooks with FAIL mode
 ## 公式参照
 
 - [Managing AWS resources as a single unit with CloudFormation stacks](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html)
+- [What is the AWS CDK?](https://docs.aws.amazon.com/cdk/v2/guide/home.html)
+- [Learn AWS CDK core concepts](https://docs.aws.amazon.com/cdk/v2/guide/core-concepts.html)
 - [Update CloudFormation stacks using change sets](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks-changesets.html)
 - [Detect unmanaged configuration changes with drift detection](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-stack-drift.html)
 - [Managing stacks across accounts and Regions with StackSets](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/what-is-cfnstacksets.html)

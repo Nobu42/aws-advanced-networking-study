@@ -419,6 +419,33 @@ DNS名で宛先を選ぶ = Route 53
 IP固定が必要 = Global Accelerator
 ```
 
+## API Gatewayとエッジネットワーク
+
+API GatewayはAPIの入口を提供するマネージドサービスで、CloudFront、WAF、ACM、Route 53と組み合わせて問われることがある。
+
+重要な2パターン:
+
+| パターン | 通信の向き | 覚えること |
+| :--- | :--- | :--- |
+| Private API | VPC内クライアント -> API Gateway | Interface VPC Endpoint経由でAPI Gatewayをprivateに呼ぶ |
+| VPC Link | API Gateway -> VPC内バックエンド | Private Subnet内のALB/NLB/サービスへAPI Gatewayから接続する |
+
+試験での見方:
+
+```text
+APIをVPC内だけから呼ばせたい
+= API Gateway Private API + execute-api Interface Endpoint + resource policy
+
+API Gatewayを公開入口にし、backendはprivate subnetに置きたい
+= API Gateway + VPC Link + private ALB/NLB/backend
+```
+
+ひっかけ:
+
+- Private APIとVPC Linkは方向が逆
+- CloudFrontはキャッシュ/エッジ配信、API GatewayはAPI管理
+- API Gatewayの前段にCloudFrontやWAFを組み合わせる構成もある
+
 ## AWS WAF on CloudFront
 
 AWS WAFは、HTTP/HTTPSのWebリクエストをL7で検査する。
@@ -551,6 +578,8 @@ only specific applications can decrypt
 | Web APIでキャッシュせず固定IPが必要 | Global Accelerator |
 | UDP/TCPゲームサーバを世界中から低遅延化 | Global Accelerator |
 | 顧客Firewallに固定宛先IPを登録したい | Global Accelerator |
+| APIをVPC内からprivateに呼ばせたい | API Gateway Private API + Interface Endpoint |
+| API Gatewayからprivate subnetのbackendへ接続 | API Gateway VPC Link |
 | S3 bucketをprivateのままCloudFront配信 | CloudFront OAC |
 | CloudFront経由のみでprivate content配信 | OAC + signed URL/cookie |
 | 軽いURL rewriteやredirect | CloudFront Functions |
@@ -587,6 +616,8 @@ only specific applications can decrypt
 - [ ] CloudFront origin failoverは主にGET/HEAD/OPTIONSで使う
 - [ ] AWS WAFはSQLi/XSS/rate-based ruleなどL7防御
 - [ ] Shield AdvancedはDDoS対策強化
+- [ ] Private APIはVPC内からAPI Gatewayへ入る
+- [ ] VPC LinkはAPI GatewayからVPC内バックエンドへ入る
 
 ## 公式参照
 
@@ -603,3 +634,6 @@ only specific applications can decrypt
 - [What is AWS Global Accelerator?](https://docs.aws.amazon.com/global-accelerator/latest/dg/what-is-global-accelerator.html)
 - [AWS Global Accelerator components](https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-components.html)
 - [Preserve client IP addresses in Global Accelerator](https://docs.aws.amazon.com/global-accelerator/latest/dg/preserve-client-ip-address.html)
+- [Private REST APIs in API Gateway](https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-private-apis.html)
+- [Create a private API](https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-private-api-create.html)
+- [Private integrations for REST APIs in API Gateway](https://docs.aws.amazon.com/apigateway/latest/developerguide/private-integration.html)
