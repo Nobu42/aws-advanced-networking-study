@@ -17,6 +17,7 @@ AWSネットワークの設計、実装、運用、トラブルシューティ�
 | サービス | [Edge Network Services ANS-C01対策](./services/edge-network-services-for-ans-c01.md) | CloudFront、Global Accelerator、Lambda@Edgeを確認する |
 | サービス | [Security Services ANS-C01対策](./services/security-services-for-ans-c01.md) | Shield、WAF、Firewall Manager、IDS/IPS、DNS Firewall、ACMを確認する |
 | サービス | [Network Automation ANS-C01対策](./services/network-automation-for-ans-c01.md) | CloudFormation、AWS CLI、AWS SDK、AWS Configによる構築・構成自動化を確認する |
+| サービス | [Monitoring and Operations ANS-C01対策](./services/monitoring-and-operations-for-ans-c01.md) | CloudWatch、CloudTrail、AWS Config、VPC Flow Logsなどの監視・運用を確認する |
 | 構成図 | [ネットワーク構成図](./diagrams/README.md) | VPC、TGW、DX/VPN、DNS、Inspection構成を図で確認する |
 | ハンズオン | [Labs](./labs/README.md) | 手順、CLI、検証結果を記録する |
 | 問題演習 | [Practice Questions](./practice-questions/README.md) | 練習問題と解説を整理する |
