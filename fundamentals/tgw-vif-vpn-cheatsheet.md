@@ -4,6 +4,19 @@
 
 ANS-C01で頻出のTransit Gateway（TGW）、Direct ConnectのVIF、Site-to-Site VPN接続を、問題文から判断しやすい形で整理する。
 
+見直し後の対象範囲は、次の「拠点間ネットワーキング」まで含める。
+
+```text
+VPC間接続
+複数アカウント間接続
+複数リージョン間接続
+オンプレミス - AWS接続
+リモートユーザー - AWS接続
+VPCからAWSサービスへのprivate接続
+VPCから他アカウント/自社サービスへのprivate接続
+集中検査VPC経由の接続
+```
+
 覚える軸は次の3つ。
 
 ```text
@@ -33,6 +46,13 @@ Transit Gateway
   ├─ Direct Connect Gateway attachment
   ├─ Peering attachment
   └─ Connect attachment
+
+VPC間 / AWS環境間
+  ├─ VPC Peering
+  ├─ Transit Gateway
+  ├─ PrivateLink / VPC Endpoint
+  ├─ Gateway Load Balancer Endpoint
+  └─ AWS RAMによる共有
 ```
 
 ## 最初に覚える結論
@@ -46,6 +66,36 @@ Transit Gateway
 | 多数VPC、複数アカウント、オンプレを集約したい | Transit Gateway |
 | ステートフルFW/IDS/IPSでVPC間通信を検査したい | TGW + Inspection VPC + GWLB/GWLBE + Appliance Mode |
 | SD-WANアプライアンスとTGWを動的接続したい | TGW Connect |
+| 2つのVPCをシンプルにprivate接続したい | VPC Peering |
+| 他アカウント/他VPCのサービスだけをprivate公開したい | AWS PrivateLink |
+| VPCからS3/DynamoDBへprivate接続したい | Gateway VPC Endpoint |
+| VPCからAWS APIへprivate接続したい | Interface VPC Endpoint |
+| 複数アカウントでTGWやsubnetなどを共有したい | AWS RAM |
+| リモートユーザーがAWS/オンプレへVPN接続したい | AWS Client VPN |
+
+## 接続方式の選択表
+
+| 接続したいもの | 第一候補 | 向いているケース | 注意点 |
+| :--- | :--- | :--- | :--- |
+| VPC - VPC | VPC Peering | 少数VPC、シンプル、低遅延 | 推移的ルーティング不可。多数VPCでは管理が複雑 |
+| 多数VPC - 多数VPC | Transit Gateway | hub and spoke、複数アカウント、集中管理 | TGW route table設計が必要 |
+| VPC - 他アカウントの特定サービス | PrivateLink | サービス単位で公開、consumer/provider分離 | VPC全体の双方向接続ではない |
+| VPC - AWSサービス | VPC Endpoint | private subnetからAWS API/S3等へprivate接続 | Gateway endpointとInterface endpointを区別 |
+| オンプレ - 1 VPC | VPN to VGW / Private VIF to VGW | 小規模、単一VPC | 拡張性はTGWより低い |
+| オンプレ - 複数VPC | VPN to TGW / Transit VIF + DXGW + TGW | 大規模、複数VPC、複数アカウント | TGW/DXGW/route propagationが重要 |
+| オンプレ - AWS public service | Public VIF | S3などpublic endpointへDX経由 | VPCへ入る用途ではない |
+| リモート端末 - AWS/オンプレ | AWS Client VPN | ユーザー単位のリモートアクセス | Site-to-Site VPNとは用途が違う |
+| 検査VPC経由通信 | TGW + GWLB/GWLBE + Appliance Mode | firewall/IDS/IPS集中検査 | 非対称ルーティングに注意 |
+
+## ANS-C01での優先度
+
+| 優先度 | 覚えるもの |
+| :--- | :--- |
+| 最重要 | TGW、VIF、DXGW、Site-to-Site VPN、BGP、VPC Peering、PrivateLink |
+| 重要 | VPC Endpoint、Gateway Endpoint、Interface Endpoint、AWS RAM、Appliance Mode、GWLB/GWLBE |
+| 出たら拾う | Client VPN、TGW Connect、Direct Connect SiteLink、Network Manager |
+
+試験ガイド上も、Direct Connect Gateway、Transit Gateway、VIF、PrivateLink、VPC Peering、VPN、BGP、route table、CIDR重複、route limitsなどが同じ領域で問われる。
 
 ## VIFとは
 
@@ -174,7 +224,7 @@ DXGW（Direct Connect Gateway）は、Direct ConnectとVPC/TGWをつなぐ中継
 | 項目 | 内容 |
 | :--- | :--- |
 | リソース種別 | グローバルリソース |
-| 役割 | DXとVGW/TGW/Cloud WANを中継 |
+| 役割 | DXとVGW/TGWなどを中継 |
 | データパス | DXGW自体が単一の物理中継点になるわけではない |
 | Private VIF | DXGW経由でVGWへ接続できる |
 | Transit VIF | DXGW経由でTGWへ接続する |
@@ -205,6 +255,57 @@ AWSから広告:    10.0.0.0/8
 ```
 
 試験ではここが引っかけになりやすい。
+
+## Direct Connectの冗長化
+
+Direct Connectは専用線だが、1本だけでは単一障害点になる。
+
+ANS-C01では、可用性要件に応じて複数接続を選ぶ。
+
+| 要件 | 設計 |
+| :--- | :--- |
+| 最低限の冗長化 | 2本のDX接続 |
+| 拠点障害にも備える | 異なるDXロケーションに接続 |
+| デバイス障害にも備える | 異なるオンプレルーター/回線終端 |
+| DX障害時に低コストでバックアップ | Site-to-Site VPNをbackup |
+| Active/Activeで帯域利用 | 同じprefix長、同等BGP属性、ECMP |
+| Active/Passiveで優先制御 | より具体的なprefix、local preference community、AS_PATH prepending |
+
+覚えること:
+
+```text
+DX = 安定帯域、低遅延、専用接続
+VPN = 暗号化、短期導入、DX backupに使いやすい
+DX + VPN = よくあるハイブリッド冗長構成
+```
+
+## Direct Connect SiteLink
+
+Direct Connect SiteLinkは、複数のオンプレミス拠点同士をAWSグローバルネットワーク経由で接続する機能である。
+
+```text
+拠点A
+  -> DX location A
+  -> AWS global network
+  -> DX location B
+  -> 拠点B
+```
+
+試験での見方:
+
+| 問題文 | 疑う答え |
+| :--- | :--- |
+| オンプレ拠点間をAWS backboneで接続したい | Direct Connect SiteLink |
+| VPCへ接続したい | Private VIF / Transit VIF |
+| AWS public serviceへ接続したい | Public VIF |
+
+注意:
+
+```text
+SiteLink = 拠点間接続
+Transit VIF = DXからTGWへ接続
+Public VIF = AWS public serviceへ接続
+```
 
 ## TGWとは
 
@@ -315,6 +416,195 @@ TGW Peeringは、TGW同士を接続する仕組みである。
 | ルーティング | 静的ルートが必要 |
 | 伝播 | TGW Peering経由の自動伝播には注意 |
 | 推移的接続 | 設計上、意図しない推移的ルーティングを期待しない |
+
+## VPC Peering
+
+VPC Peeringは、2つのVPCをprivate IPで直接接続する仕組みである。
+
+```text
+VPC A
+  <-> VPC Peering
+VPC B
+```
+
+覚えること:
+
+| 項目 | 内容 |
+| :--- | :--- |
+| 用途 | 少数VPC間のシンプルなprivate接続 |
+| 接続範囲 | 同一リージョン、または異なるリージョン |
+| アカウント | 同一アカウント、またはクロスアカウント |
+| 経路 | 両側VPC route tableに相手CIDRへのrouteが必要 |
+| CIDR | 重複CIDRは不可 |
+| 推移的ルーティング | 不可 |
+| 中央集約 | 多数VPCではTGWの方が向く |
+
+試験での見方:
+
+| 問題文 | 答え |
+| :--- | :--- |
+| 2つのVPCだけを接続したい | VPC Peering |
+| 多数VPCをhub and spokeで集約 | Transit Gateway |
+| VPC AからVPC B経由でVPC Cへ行きたい | VPC Peeringでは不可。TGWなどを検討 |
+| CIDRが重複している | VPC Peeringでは接続不可 |
+
+## VPC PeeringとTGWの使い分け
+
+| 観点 | VPC Peering | Transit Gateway |
+| :--- | :--- | :--- |
+| 規模 | 少数VPC | 多数VPC |
+| 構成 | point-to-point | hub and spoke |
+| 推移的ルーティング | 不可 | 可能な設計にできる |
+| ルート管理 | VPCごとに個別管理 | TGW route tableで集約管理 |
+| コスト | 小規模なら低コストになりやすい | attachment/処理量課金を考慮 |
+| 検査VPC | 設計しづらい | Inspection VPCを組み込みやすい |
+
+覚え方:
+
+```text
+少数・単純 = VPC Peering
+多数・集約・オンプレ連携 = Transit Gateway
+```
+
+## PrivateLink
+
+AWS PrivateLinkは、VPCからサービスやリソースへprivate IPで接続するための仕組みである。
+
+```text
+Consumer VPC
+  -> Interface Endpoint
+  -> Endpoint Service
+  -> NLB / GWLB / Service
+  -> Provider VPC
+```
+
+重要:
+
+```text
+PrivateLinkはVPC全体をつなぐ技術ではない。
+サービス単位でprivate公開する技術。
+```
+
+覚えること:
+
+| 項目 | 内容 |
+| :--- | :--- |
+| Consumer | サービスを使う側 |
+| Provider | サービスを提供する側 |
+| Interface Endpoint | consumer VPCに作るENI型endpoint |
+| Endpoint Service | providerが公開するサービス |
+| NLB | endpoint serviceの代表的な背後LB |
+| DNS | private DNS名でendpointへ解決させることが多い |
+| アクセス方向 | 基本はconsumerからproviderのサービスへ |
+| CIDR重複 | VPC Peering/TGWより許容しやすい設計にできる |
+
+試験での見方:
+
+| 問題文 | 答え |
+| :--- | :--- |
+| 他アカウントのサービスだけprivate公開したい | PrivateLink |
+| VPC全体の双方向通信が必要 | TGWまたはVPC Peering |
+| CIDRが重複しているが特定サービスだけ接続したい | PrivateLink |
+| SaaS/Marketplace serviceへprivate接続 | PrivateLink |
+| 検査アプライアンスへprivate転送 | GWLB Endpoint |
+
+## VPC Endpoint
+
+VPC Endpointは、VPCからAWSサービスやPrivateLink対応サービスへprivate接続する入口である。
+
+| Endpoint種類 | 主な用途 | Route table設定 | 代表例 |
+| :--- | :--- | :--- | :--- |
+| Gateway Endpoint | S3/DynamoDB | 必要 | S3、DynamoDB |
+| Interface Endpoint | AWS API/PrivateLink service | 通常はDNS利用 | EC2 API、CloudWatch、STS、KMSなど |
+| Gateway Load Balancer Endpoint | Security appliance/GWLB | 必要 | firewall、IDS/IPS、DPI |
+
+試験での見方:
+
+| 問題文 | 答え |
+| :--- | :--- |
+| private subnetからS3へNATなしで接続 | Gateway Endpoint for S3 |
+| private subnetからAWS APIへprivate接続 | Interface Endpoint |
+| 特定AWS APIだけendpoint policyで制御 | Interface Endpoint + endpoint policy |
+| firewall applianceへ透過的に流したい | GWLB Endpoint |
+
+注意:
+
+```text
+Gateway EndpointはS3/DynamoDB向け。
+Interface EndpointはENIとprivate IPを持つ。
+GWLB Endpointはroute tableのtargetにして検査経路へ使う。
+ANS-C01ではまずGateway/Interface/GWLBEを優先して覚える。
+```
+
+## AWS RAMとクロスアカウント接続
+
+AWS RAM（Resource Access Manager）は、AWSリソースを複数アカウントへ共有するサービスである。
+
+ネットワークで出やすい共有対象:
+
+```text
+Transit Gateway
+Subnet
+Route 53 Resolver rule
+IPAM pool
+```
+
+TGWのクロスアカウント利用:
+
+```text
+Network account
+  -> TGWを作成
+  -> AWS RAMで開発/本番/運用アカウントへ共有
+  -> 各アカウントのVPCをTGW attachment
+```
+
+試験での見方:
+
+| 問題文 | 答え |
+| :--- | :--- |
+| 複数アカウントで中央TGWを使いたい | AWS RAMでTGW共有 |
+| Organizations配下へ一貫した共有 | AWS RAM + Organizations |
+| アカウントごとにTGWを重複作成したくない | AWS RAM |
+
+## Client VPN
+
+AWS Client VPNは、ユーザー端末からAWSやオンプレミスリソースへ接続するマネージドVPNである。
+
+```text
+User PC
+  -> OpenVPN-based client
+  -> Client VPN endpoint
+  -> VPC / peered VPC / TGW / on-prem
+```
+
+Site-to-Site VPNとの違い:
+
+| 観点 | Client VPN | Site-to-Site VPN |
+| :--- | :--- | :--- |
+| 接続元 | ユーザー端末 | 拠点ルーター |
+| 目的 | リモートアクセス | 拠点間接続 |
+| 暗号化 | TLS VPN | IPsec VPN |
+| 認証 | AD、SAML、証明書など | PSK/証明書、IKE/IPsec |
+| 試験キーワード | remote user、client-based、OpenVPN | branch office、data center、IPsec |
+
+試験での見方:
+
+```text
+社員PCからVPCへ安全に接続 = Client VPN
+オンプレ拠点からAWSへ接続 = Site-to-Site VPN
+```
+
+## Transit Gateway Network Manager
+
+Transit Gateway Network Managerは、TGWを含むグローバルネットワークの可視化や運用確認で出る。
+
+試験での見方:
+
+| 問題文 | 答え |
+| :--- | :--- |
+| TGW中心のネットワークトポロジーを可視化 | Transit Gateway Network Manager |
+| 複数リージョン/複数拠点の接続状態を把握 | Network Manager |
+| 経路や到達性を詳細に切り分け | Reachability Analyzer / TGW route table / Flow Logs |
 
 ## TGW Appliance Mode
 
@@ -483,6 +773,53 @@ Accelerated VPNは、AWS Global Acceleratorを使ってVPNトラフィックを�
 | 接続先 | Transit Gateway |
 | 注意 | 既存VPNを後から高速化ONではなく、新しいAccelerated VPNを作って切替 |
 
+## DX / VPNの経路優先
+
+ハイブリッド接続では、同じ宛先CIDRが複数経路から見えることがある。
+
+基本原則:
+
+```text
+1. 最長一致が優先
+2. static routeはpropagated routeより優先される場面が多い
+3. VPN/DXではBGP属性で優先経路を調整する
+4. tunnelやconnectionのhealthは経路属性より優先される
+```
+
+Site-to-Site VPN/VGWで同一prefixが競合する場合の代表的な優先順:
+
+```text
+Direct Connect BGP propagated route
+  > Site-to-Site VPN static route
+  > Site-to-Site VPN BGP propagated route
+```
+
+Direct ConnectのBGP経路制御で見る順序:
+
+```text
+prefix length
+  -> local preference community
+  -> AS_PATH length
+  -> MED
+```
+
+試験での見方:
+
+| 問題文 | 疑う答え |
+| :--- | :--- |
+| DXを主系、VPNをbackupにしたい | DX + VPN、BGP経路優先を調整 |
+| 特定prefixだけ別回線へ流したい | より具体的なprefixを広告 |
+| inbound to on-premの優先を変えたい | Direct Connect BGP community / local preference |
+| 2本のDXでActive/Active | 同一prefix長、同等BGP属性、ECMP |
+| VPNで複数トンネルを使いたい | TGW + ECMP。VGWではECMP不可 |
+
+注意:
+
+```text
+経路制御は「AWSからオンプレへ」と「オンプレからAWSへ」で効く属性が違う。
+問題文がどちら向きのtrafficを制御したいのかを読む。
+```
+
 ## TGW + VPN + DXの使い分け
 
 | 要件 | 選択肢 |
@@ -494,6 +831,12 @@ Accelerated VPNは、AWS Global Acceleratorを使ってVPNトラフィックを�
 | DXからTGWへ接続 | Transit VIF + DXGW |
 | VPNからTGWへ接続 | VPN attachment |
 | グローバル拠点からVPN品質を改善 | Accelerated VPN |
+| 少数VPC間を簡単に接続 | VPC Peering |
+| 他VPC/他アカウントのサービスだけprivate公開 | PrivateLink |
+| S3/DynamoDBへprivate接続 | Gateway VPC Endpoint |
+| AWS APIへprivate接続 | Interface VPC Endpoint |
+| リモートユーザーをAWSへ接続 | Client VPN |
+| 複数アカウントで中央TGWを共有 | AWS RAM |
 
 ## 試験での見抜き方
 
@@ -514,6 +857,14 @@ Accelerated VPNは、AWS Global Acceleratorを使ってVPNトラフィックを�
 | 往復通信が別Firewallへ行き失敗 | Appliance Mode |
 | TGWで通信できない | Association/Propagation/Route Tableを確認 |
 | TGWへ入った通信の出口が不明 | Ingress attachmentのAssociationを見る |
+| 2 VPCのみの単純接続 | VPC Peering |
+| VPC PeeringでA-B-C接続したい | 推移的ルーティング不可。TGWを検討 |
+| CIDR重複だが特定サービスだけ接続 | PrivateLink |
+| private subnetからS3へNATなし | Gateway Endpoint |
+| private subnetからCloudWatch/STS/KMS等へNATなし | Interface Endpoint |
+| 複数アカウントでTGWを共用 | AWS RAM |
+| ユーザー端末からAWSへVPN | Client VPN |
+| オンプレ拠点間をAWS backboneで接続 | Direct Connect SiteLink |
 
 ## 最小暗記セット
 
@@ -545,12 +896,36 @@ BGP非対応 = Static routing
 単一VPC = VGW
 ```
 
+### VPC間/AWS環境間
+
+```text
+VPC Peering = 2 VPCを直接接続、推移的ルーティング不可
+TGW = 多数VPC/オンプレをhub and spokeで集約
+PrivateLink = VPC全体ではなくサービス単位でprivate公開
+Gateway Endpoint = S3/DynamoDB
+Interface Endpoint = AWS API/PrivateLink service
+GWLBE = security applianceへroute
+AWS RAM = TGW/subnet/Resolver ruleなどをクロスアカウント共有
+Client VPN = ユーザー端末からTLS VPN
+```
+
 ## 公式参照
 
+- [ANS-C01 Content Domain 3: Network Management and Operation](https://docs.aws.amazon.com/aws-certification/latest/advanced-networking-specialty-01/advanced-networking-specialty-01-domain3.html)
+- [ANS-C01 In-Scope AWS Services](https://docs.aws.amazon.com/aws-certification/latest/advanced-networking-specialty-01/ans-01-in-scope-services.html)
 - [AWS Direct Connect virtual interfaces](https://docs.aws.amazon.com/directconnect/latest/UserGuide/WorkingWithVirtualInterfaces.html)
 - [Create a transit virtual interface to the Direct Connect gateway](https://docs.aws.amazon.com/directconnect/latest/UserGuide/create-transit-vif-for-gateway.html)
 - [Direct Connect gateways and Transit Gateway associations](https://docs.aws.amazon.com/directconnect/latest/UserGuide/direct-connect-transit-gateways.html)
 - [Allowed prefixes interactions for Direct Connect gateways](https://docs.aws.amazon.com/directconnect/latest/UserGuide/allowed-to-prefixes.html)
+- [Direct Connect routing policies and BGP communities](https://docs.aws.amazon.com/directconnect/latest/UserGuide/routing-and-bgp.html)
+- [Direct Connect SiteLink](https://docs.aws.amazon.com/directconnect/latest/UserGuide/dx-sitelink.html)
 - [Transit Gateway VPC attachments and appliance mode](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-vpc-attachments.html)
+- [How AWS Transit Gateway works](https://docs.aws.amazon.com/vpc/latest/tgw/how-transit-gateways-work.html)
+- [Connect attachments and Connect peers in AWS Transit Gateway](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-connect.html)
+- [What is VPC peering?](https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html)
+- [What is AWS PrivateLink?](https://docs.aws.amazon.com/vpc/latest/privatelink/what-is-privatelink.html)
+- [AWS PrivateLink concepts](https://docs.aws.amazon.com/vpc/latest/privatelink/concepts.html)
+- [What is AWS Resource Access Manager?](https://docs.aws.amazon.com/ram/latest/userguide/what-is.html)
+- [What is AWS Client VPN?](https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/what-is.html)
 - [Static and dynamic routing in AWS Site-to-Site VPN](https://docs.aws.amazon.com/vpn/latest/s2svpn/vpn-static-dynamic.html)
 - [Site-to-Site VPN route priority](https://docs.aws.amazon.com/vpn/latest/s2svpn/vpn-route-priority.html)
