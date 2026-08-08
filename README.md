@@ -4,6 +4,22 @@ AWS Certified Advanced Networking - Specialty（ANS-C01）の学習用リポジ�
 
 AWSネットワークの設計、実装、運用、トラブルシューティング、セキュリティを、試験対策とハンズオンの両面から整理する。
 
+## 目次
+
+| 分類 | リンク | 用途 |
+| :--- | :--- | :--- |
+| 試験全体 | [ANS-C01ドメインマップ](./exam-guide/ans-c01-domain-map.md) | 出題ドメインと学習範囲を確認する |
+| 用語 | [ANS-C01 頻出・必須用語集](./exam-guide/ans-c01-key-terms.md) | 必須用語を詳細説明つきで確認する |
+| 暗記 | [ANS-C01 直前暗記チートシート](./exam-guide/ans-c01-memorization-cheatsheet.md) | 数字、制約、頻出キーワードを試験前に確認する |
+| 基礎 | [BGP for ANS-C01](./fundamentals/bgp-for-ans-c01.md) | Direct Connect、VPN、TGWで必要なBGPを確認する |
+| 基礎 | [TGW/VIF/VPN チートシート](./fundamentals/tgw-vif-vpn-cheatsheet.md) | Transit Gateway、VIF、VPN接続をまとめて確認する |
+| サービス | [Route 53 ANS-C01対策](./services/route53-for-ans-c01.md) | DNS、Resolver、ルーティングポリシーを確認する |
+| サービス | [Edge Network Services ANS-C01対策](./services/edge-network-services-for-ans-c01.md) | CloudFront、Global Accelerator、Lambda@Edgeを確認する |
+| 構成図 | [ネットワーク構成図](./diagrams/README.md) | VPC、TGW、DX/VPN、DNS、Inspection構成を図で確認する |
+| ハンズオン | [Labs](./labs/README.md) | 手順、CLI、検証結果を記録する |
+| 問題演習 | [Practice Questions](./practice-questions/README.md) | 練習問題と解説を整理する |
+| 誤答分析 | [Incorrect Answers](./incorrect-answers/README.md) | 間違えた問題と弱点を整理する |
+
 ## 学習方針
 
 - 公式試験ガイドのドメインに沿って学習する
