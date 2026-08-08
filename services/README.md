@@ -10,7 +10,7 @@ AWSネットワークサービスごとに、用途、設計判断、制約、�
 - AWS Site-to-Site VPN
 - AWS Client VPN
 - AWS PrivateLink
-- Amazon Route 53
+- [Amazon Route 53](./route53-for-ans-c01.md)
 - Elastic Load Balancing
 - Amazon CloudFront
 - AWS Global Accelerator
